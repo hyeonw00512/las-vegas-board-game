@@ -6,5 +6,4 @@ services:
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /health
-    maxShutdownDelaySeconds: 15
     autoDeployTrigger: checksPass
