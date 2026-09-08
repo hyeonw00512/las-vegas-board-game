@@ -4,7 +4,7 @@
 * { box-sizing:border-box; }
 html { min-height:100%; overflow-x:hidden; }
 html, body { margin:0; background:#06100f; color:var(--ink); font-family:Inter,'Noto Sans KR',sans-serif; }
-body { min-height:100vh; min-height:100dvh; overflow-x:hidden; overscroll-behavior-y:none; background:radial-gradient(circle at 62% 18%,rgba(37,125,91,.24),transparent 28%),linear-gradient(135deg,#050d0c,#0a1916 55%,#050d0c); }
+body { min-height:100vh; min-height:100dvh; overflow-x:hidden; background:radial-gradient(circle at 62% 18%,rgba(37,125,91,.24),transparent 28%),linear-gradient(135deg,#050d0c,#0a1916 55%,#050d0c); }
 #phaser-ambient { position:fixed; inset:0; z-index:0; pointer-events:none; }
 #app { position:relative; z-index:1; }
 button,input { font:inherit; }
@@ -238,13 +238,13 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
   .settlement-results { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width:850px) and (orientation:portrait) {
-  .orientation-hint:not(.dismissed) { position:fixed; inset:0; z-index:30; display:grid; place-content:center; justify-items:center; gap:1rem; padding:2rem; text-align:center; background:rgba(2,9,7,.94); backdrop-filter:blur(12px); }
-  .orientation-hint i { width:54px; height:82px; border:3px solid var(--yellow); border-radius:9px; transform:rotate(90deg); box-shadow:0 0 28px rgba(245,223,91,.25); }
-  .orientation-hint i::after { content:''; display:block; width:5px; height:5px; margin:5px auto 0; border-radius:50%; background:var(--yellow); }
-  .orientation-hint div { display:grid; gap:.4rem; }
-  .orientation-hint b { color:var(--yellow); font-size:1.15rem; }
-  .orientation-hint span { color:#c5d0cb; font-size:.88rem; line-height:1.55; }
-  .orientation-hint button { margin-top:.35rem; padding:.65rem 1rem; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:.78rem; }
+  .orientation-hint:not(.dismissed) { position:fixed; left:max(.75rem,env(safe-area-inset-left)); right:max(.75rem,env(safe-area-inset-right)); bottom:max(.75rem,env(safe-area-inset-bottom)); z-index:30; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.65rem; padding:.7rem .8rem; background:rgba(2,9,7,.92); border:1px solid rgba(245,223,91,.35); box-shadow:0 14px 40px rgba(0,0,0,.42); backdrop-filter:blur(12px); pointer-events:none; }
+  .orientation-hint i { width:22px; height:34px; border:2px solid var(--yellow); border-radius:5px; transform:rotate(90deg); box-shadow:0 0 16px rgba(245,223,91,.2); }
+  .orientation-hint i::after { content:''; display:block; width:3px; height:3px; margin:3px auto 0; border-radius:50%; background:var(--yellow); }
+  .orientation-hint div { display:grid; gap:.15rem; }
+  .orientation-hint b { color:var(--yellow); font-size:.78rem; }
+  .orientation-hint span { color:#c5d0cb; font-size:.68rem; line-height:1.35; }
+  .orientation-hint button { min-height:34px; padding:.35rem .5rem; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:.65rem; pointer-events:auto; }
 }
 @media (max-width:950px) and (orientation:landscape) and (max-height:600px) {
   .game-topbar { min-height:50px; height:50px; padding:0 max(.75rem,env(safe-area-inset-right)) 0 max(.75rem,env(safe-area-inset-left)); }
