@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: las-vegas-board-game
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    maxShutdownDelaySeconds: 15
+    autoDeployTrigger: checksPass
