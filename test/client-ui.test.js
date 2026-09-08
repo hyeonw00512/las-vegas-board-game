@@ -45,3 +45,24 @@ test('모바일 안전 영역과 키보드 접근성을 제공한다', () => {
   assert.match(styles, /prefers-reduced-motion:reduce/);
   assert.match(styles, /\.die \{ width:44px; height:44px;/);
 });
+
+test('내 차례 강조와 모바일 가로 화면 안내를 제공한다', () => {
+  for (const id of ['turn-alert', 'turn-alert-action', 'orientation-hint', 'orientation-dismiss']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(script, /classList\.toggle\('my-turn', myTurn\)/);
+  assert.match(script, /document\.title = myTurn \? '🎲 내 차례 · 라스베가스'/);
+  assert.match(styles, /\.turn-alert\.visible/);
+  assert.match(styles, /orientation:portrait/);
+  assert.match(styles, /orientation:landscape/);
+});
+
+test('카지노 직접 배치와 초대 링크 참가를 제공한다', () => {
+  for (const id of ['copy-invite', 'room-code']) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(script, /function inviteLink/);
+  assert.match(script, /function applyInviteFromLocation/);
+  assert.match(script, /function normalizeRoomCode/);
+  assert.match(script, /function placeSelectedDice\(casinoNumber\)/);
+  assert.match(script, /#casino-board'\)\.addEventListener\('click', tryPlaceOnCasino/);
+  assert.match(styles, /\.casino-card\.can-place/);
+});

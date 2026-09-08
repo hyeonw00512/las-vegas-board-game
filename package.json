@@ -1,6 +1,6 @@
 {
   "name": "las-vegas-board-game",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "private": true,
   "description": "라스베가스 실시간 멀티플레이 주사위 배치 웹 보드게임",
   "type": "module",

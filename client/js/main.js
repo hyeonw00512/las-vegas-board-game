@@ -1,6 +1,6 @@
 const socket = io();
 const SESSION_KEY = 'lasVegasRoomSession';
-const state = { room: null, playerId: null, rolling: false, actionLocked: false, lastDiceSignature: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off' };
+const state = { room: null, playerId: null, rolling: false, actionLocked: false, lastDiceSignature: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
 let audioContext;
 
 if (window.Phaser) {
@@ -42,6 +42,7 @@ const screens = ['#start-screen', '#lobby-screen', '#game-screen'];
 function showScreen(id) {
   for (const selector of screens) $(selector).classList.toggle('hidden', selector !== id);
   $('#chat-toggle').classList.toggle('visible', id === '#game-screen');
+  if (id !== '#game-screen') document.title = '라스베가스';
 }
 
 function currentPlayer() {
@@ -111,6 +112,29 @@ function nickname() {
   return $('#nickname').value.trim();
 }
 
+function normalizeRoomCode(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    return String(url.searchParams.get('room') || url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  } catch {
+    const inviteCode = text.match(/(?:^|[?&#])(?:room|code)=([^&#\s]+)/i)?.[1];
+    return decodeURIComponent(inviteCode || text).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  }
+}
+
+function inviteLink(code = state.room?.code) {
+  return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(code || '')}`;
+}
+
+function applyInviteFromLocation() {
+  const code = normalizeRoomCode(window.location.href);
+  if (!code) return;
+  $('#room-code').value = code;
+  $('#start-error').textContent = '초대 링크가 적용되었습니다. 닉네임을 입력하고 참가하세요.';
+}
+
 function renderLobby() {
   const room = state.room;
   if (!room) return;
@@ -136,6 +160,10 @@ function renderGame() {
   const room = state.room;
   if (!room) return;
   const me = currentPlayer();
+  const myTurn = isMyTurn();
+  $('#game-screen').classList.toggle('my-turn', myTurn);
+  $('#turn-alert').classList.toggle('visible', myTurn);
+  document.title = myTurn ? '🎲 내 차례 · 라스베가스' : '라스베가스';
   $('#round-number').textContent = room.round;
   $('#round-total').textContent = room.settings.rounds;
   $('#game-code').textContent = room.code;
@@ -151,7 +179,7 @@ function renderGame() {
     <div class="log-row ${log.type}"><i></i><span>${escapeHtml(log.message)}</span></div>
   `).join('');
   $('#casino-board').innerHTML = [...room.casinos].sort((a, b) => a.number - b.number).map((casino) => `
-    <article class="casino-card casino-${casino.number}">
+    <article class="casino-card casino-${casino.number} ${myTurn && me?.selectedFace === casino.number ? 'can-place' : ''}" data-casino="${casino.number}" role="button" tabindex="0" aria-label="${casino.number}번 카지노${myTurn && me?.selectedFace === casino.number ? ', 선택한 주사위 배치' : ''}" aria-disabled="${myTurn && me?.selectedFace === casino.number ? 'false' : 'true'}">
       <div class="casino-number">${casino.number}</div>
       <div class="reward-stack">${casino.rewards.map((reward) => `<span>₩${reward}</span>`).join('')}</div>
       <div class="bet-zone">${renderPlacedDice(casino)}</div>
@@ -170,6 +198,9 @@ function renderGame() {
     $('#turn-label').textContent = '다른 플레이어가 선택 중입니다';
     $('#turn-player').textContent = `${turnPlayer()?.nickname ?? '플레이어'}의 차례`;
   }
+  $('#turn-alert-action').textContent = room.openingNeutralPending
+    ? '흰색 주사위 2개를 굴려주세요'
+    : me?.dice.length ? '숫자를 선택하고 카지노에 배치하세요' : '주사위를 굴려주세요';
   renderDice(me);
   renderSettlement();
   renderChat();
@@ -334,9 +365,20 @@ $('#create-button').addEventListener('click', () => enter('createRoom', {
   rounds: Number($('#round-count').value),
   turnSeconds: Number($('#turn-seconds').value)
 }));
-$('#join-button').addEventListener('click', () => enter('joinRoom', { nickname: nickname(), code: $('#room-code').value }));
-$('#room-code').addEventListener('input', (event) => { event.target.value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+async function joinRoom() {
+  const code = normalizeRoomCode($('#room-code').value);
+  if (code.length !== 5) return errorAt('#start-error', '방 코드 또는 올바른 초대 링크를 입력해주세요.');
+  $('#room-code').value = code;
+  return enter('joinRoom', { nickname: nickname(), code });
+}
+$('#join-button').addEventListener('click', joinRoom);
+$('#room-code').addEventListener('input', (event) => {
+  const text = event.target.value.trim();
+  if (!/^https?:\/\//i.test(text)) event.target.value = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+});
+$('#room-code').addEventListener('keydown', (event) => { if (event.key === 'Enter') joinRoom(); });
 $('#copy-code').addEventListener('click', async () => { await navigator.clipboard.writeText(state.room.code); toast('방 코드를 복사했습니다.'); });
+$('#copy-invite').addEventListener('click', async () => { await navigator.clipboard.writeText(inviteLink()); toast('초대 링크를 복사했습니다.'); });
 $('#ready-button').addEventListener('click', async () => { const response = await emit('toggleReady'); if (!response.ok) errorAt('#lobby-error', response.message); });
 $('#start-button').addEventListener('click', async () => { const response = await emit('startGame'); if (!response.ok) errorAt('#lobby-error', response.message); });
 $('#roll-button').addEventListener('click', async () => {
@@ -355,8 +397,11 @@ $('#dice-row').addEventListener('click', async (event) => {
   const response = await emit('selectDice', { face: Number(die.dataset.face) });
   if (!response.ok) errorAt('#game-error', response.message);
 });
-$('#place-button').addEventListener('click', async () => {
+async function placeSelectedDice(casinoNumber) {
   if (state.actionLocked || !isMyTurn()) return;
+  const selectedFace = currentPlayer()?.selectedFace;
+  if (!selectedFace) return errorAt('#game-error', '먼저 주사위 눈 하나를 선택해주세요.');
+  if (casinoNumber && selectedFace !== casinoNumber) return errorAt('#game-error', `${selectedFace}번 주사위는 ${selectedFace}번 카지노에만 놓을 수 있습니다.`);
   state.actionLocked = true;
   $('#place-button').disabled = true;
   errorAt('#game-error');
@@ -364,6 +409,19 @@ $('#place-button').addEventListener('click', async () => {
   if (!response?.ok) errorAt('#game-error', response?.message || '배치하지 못했습니다.');
   state.actionLocked = false;
   renderDice(currentPlayer());
+}
+
+$('#place-button').addEventListener('click', () => placeSelectedDice());
+function tryPlaceOnCasino(event) {
+  const card = event.target.closest('.casino-card');
+  if (!card) return;
+  placeSelectedDice(Number(card.dataset.casino));
+}
+$('#casino-board').addEventListener('click', tryPlaceOnCasino);
+$('#casino-board').addEventListener('keydown', (event) => {
+  if (!['Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  tryPlaceOnCasino(event);
 });
 $('#next-round-button').addEventListener('click', async () => {
   if (state.actionLocked) return;
@@ -415,6 +473,8 @@ socket.on('connect', async () => {
     sessionStorage.removeItem(SESSION_KEY);
   }
 });
+
+applyInviteFromLocation();
 
 socket.on('dicePlaced', ({ roundPlacementComplete }) => {
   playSound('place');
@@ -471,6 +531,13 @@ $('#sound-toggle').addEventListener('click', () => {
   if (state.soundEnabled) playSound('place');
 });
 renderSoundButton();
+
+if (state.orientationHintDismissed) $('#orientation-hint').classList.add('dismissed');
+$('#orientation-dismiss').addEventListener('click', () => {
+  state.orientationHintDismissed = true;
+  sessionStorage.setItem('lasVegasOrientationHint', 'dismissed');
+  $('#orientation-hint').classList.add('dismissed');
+});
 
 async function leaveRoom() {
   const response = await emit('leaveRoom');

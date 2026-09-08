@@ -31,7 +31,7 @@
           <div class="entry-grid">
             <button id="create-button" class="primary-button">새 테이블 열기</button>
             <div class="join-row">
-              <input id="room-code" maxlength="5" autocomplete="off" placeholder="방 코드" aria-label="방 코드" />
+              <input id="room-code" autocomplete="off" placeholder="방 코드 또는 초대 링크" aria-label="방 코드 또는 초대 링크" />
               <button id="join-button" class="secondary-button">참가</button>
             </div>
           </div>
@@ -44,7 +44,7 @@
         <header class="topbar">
           <div><span class="eyebrow">PRIVATE TABLE</span><strong>LAS VEGAS</strong></div>
           <button class="rules-open topbar-rule">플레이 방법</button>
-          <div class="room-badge">ROOM <b id="lobby-code"></b><button id="copy-code" aria-label="방 코드 복사">복사</button></div>
+          <div class="room-badge">ROOM <b id="lobby-code"></b><button id="copy-code" aria-label="방 코드 복사">코드 복사</button><button id="copy-invite" aria-label="초대 링크 복사">초대 링크</button></div>
         </header>
         <div class="lobby-layout">
           <div class="lobby-copy"><span>WAITING ROOM</span><h2>모두 준비되면<br />테이블이 열립니다.</h2><p id="lobby-settings">최소 2명 · 최대 5명</p></div>
@@ -67,6 +67,14 @@
           <div class="round-box"><span>ROUND</span><b id="round-number">1</b><small>/ <i id="round-total">4</i></small></div>
           <div class="room-actions"><button id="sound-toggle" class="topbar-rule" aria-pressed="false">사운드 ON</button><button class="rules-open topbar-rule">플레이 방법</button><div class="room-mini">ROOM <b id="game-code"></b></div></div>
         </header>
+        <div id="turn-alert" class="turn-alert" role="status" aria-live="polite">
+          <span>YOUR TURN</span><b id="turn-alert-action">주사위를 굴려주세요</b>
+        </div>
+        <aside id="orientation-hint" class="orientation-hint" aria-label="가로 화면 권장 안내">
+          <i aria-hidden="true"></i>
+          <div><b>가로 화면을 권장합니다</b><span>화면 회전 잠금을 끄고 휴대폰을 옆으로 돌려주세요.</span></div>
+          <button id="orientation-dismiss" type="button">세로로 계속</button>
+        </aside>
         <div class="game-layout">
           <aside class="scoreboard">
             <div class="panel-heading"><h3>플레이어</h3><span>보유 칩</span></div>
