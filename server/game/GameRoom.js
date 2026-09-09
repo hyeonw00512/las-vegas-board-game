@@ -165,7 +165,8 @@ export class GameRoom {
       player.remainingNeutralDice = neutralCount;
       player.selectedFace = null;
     }
-    this.resetTurnDeadline();
+    if (this.openingNeutralPending) this.turnDeadline = null;
+    else this.resetTurnDeadline();
   }
 
   nextRound(socketId) {
@@ -227,21 +228,20 @@ export class GameRoom {
     this.removePlayer(playerId);
   }
 
-  rollOpeningNeutral(socketId) {
+  assignOpeningNeutral() {
     if (!this.openingNeutralPending) throw new Error('사전 배치할 중립 주사위가 없습니다.');
-    this.assertTurn(socketId);
     const dice = Array.from({ length: 2 }, () => randomInt(1, 7));
     for (const face of dice) {
       this.casinos[face - 1].placedDice.push(this.makePlacedDie(null, true));
     }
     this.openingNeutralPending = false;
     this.lastAction = {
-      playerId: socketId,
-      nickname: this.currentTurnPlayer().nickname,
+      playerId: NEUTRAL_ID,
+      nickname: '시스템',
       openingNeutral: true,
       faces: dice
     };
-    this.addLog(`${this.currentTurnPlayer().nickname}님이 흰색 주사위 ${dice.join('·')}을 사전 배치했습니다.`, 'neutral');
+    this.addLog(`시스템이 남는 흰색 주사위 ${dice.join('·')}을 자동 배치했습니다.`, 'neutral');
     this.resetTurnDeadline();
     return dice;
   }
@@ -249,7 +249,7 @@ export class GameRoom {
   roll(socketId) {
     if (this.status !== 'PLAYING') throw new Error('게임이 진행 중이 아닙니다.');
     if (this.roundPlacementComplete) throw new Error('이번 라운드의 배치가 끝났습니다.');
-    if (this.openingNeutralPending) throw new Error('선플레이어가 중립 주사위를 먼저 배치해야 합니다.');
+    if (this.openingNeutralPending) throw new Error('시스템이 남는 중립 주사위를 배정 중입니다.');
     this.assertTurn(socketId);
     const player = this.getPlayer(socketId);
     if (!player) throw new Error('플레이어를 찾을 수 없습니다.');
@@ -339,11 +339,6 @@ export class GameRoom {
     if (this.status !== 'PLAYING' || !this.turnDeadline || Date.now() < this.turnDeadline) return null;
     const player = this.currentTurnPlayer();
     if (!player) return null;
-    if (this.openingNeutralPending) {
-      const dice = this.rollOpeningNeutral(player.id);
-      this.addLog(`${player.nickname}님의 제한 시간이 끝나 중립 주사위를 자동 배치했습니다.`, 'timeout');
-      return { type: 'OPENING_NEUTRAL', playerId: player.id, dice };
-    }
     if (!player.dice.length) this.roll(player.id);
     const counts = new Map();
     for (const die of player.dice) counts.set(die.face, (counts.get(die.face) || 0) + 1);

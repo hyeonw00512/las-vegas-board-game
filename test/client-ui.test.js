@@ -66,3 +66,9 @@ test('카지노 직접 배치와 초대 링크 참가를 제공한다', () => {
   assert.match(script, /#casino-board'\)\.addEventListener\('click', tryPlaceOnCasino/);
   assert.match(styles, /\.casino-card\.can-place/);
 });
+
+test('3인전 남는 주사위는 시스템 배정 상태를 표시한다', () => {
+  assert.match(script, /남는 주사위 배정 중…/);
+  assert.doesNotMatch(script, /emit\(state\.room\?\.openingNeutralPending \? 'rollOpeningNeutral'/);
+  assert.match(html, /시스템이 자동으로 굴려/);
+});

@@ -12,6 +12,7 @@ const io = new Server(httpServer, { cors: { origin: false } });
 const rooms = new Map();
 const reconnectTimers = new Map();
 const RECONNECT_GRACE_MS = 60_000;
+const OPENING_NEUTRAL_DELAY_MS = 900;
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const clientPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../client');
 
@@ -29,6 +30,16 @@ function reply(callback, payload) {
 
 function publish(room) {
   io.to(room.code).emit('roomState', room.toJSON());
+}
+
+function scheduleOpeningNeutral(room) {
+  if (!room.openingNeutralPending) return;
+  setTimeout(() => {
+    if (rooms.get(room.code) !== room || room.status !== 'PLAYING' || !room.openingNeutralPending) return;
+    const dice = room.assignOpeningNeutral();
+    publish(room);
+    io.to(room.code).emit('openingNeutralPlaced', { dice });
+  }, OPENING_NEUTRAL_DELAY_MS);
 }
 
 function findSocketRoom(socket) {
@@ -114,6 +125,7 @@ io.on('connection', (socket) => {
       if (!room) throw new Error('참가 중인 방이 없습니다.');
       room.start(socketPlayerId(socket));
       publish(room);
+      scheduleOpeningNeutral(room);
       io.to(room.code).emit('gameStarted');
       reply(callback, { ok: true });
     } catch (error) {
@@ -127,19 +139,6 @@ io.on('connection', (socket) => {
       if (!room) throw new Error('참가 중인 방이 없습니다.');
       const dice = room.roll(socketPlayerId(socket));
       publish(room);
-      reply(callback, { ok: true, dice });
-    } catch (error) {
-      reply(callback, { ok: false, message: error.message });
-    }
-  });
-
-  socket.on('rollOpeningNeutral', (_, callback) => {
-    try {
-      const room = findSocketRoom(socket);
-      if (!room) throw new Error('참가 중인 방이 없습니다.');
-      const dice = room.rollOpeningNeutral(socketPlayerId(socket));
-      publish(room);
-      io.to(room.code).emit('openingNeutralPlaced', { dice });
       reply(callback, { ok: true, dice });
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
@@ -177,6 +176,7 @@ io.on('connection', (socket) => {
       if (!room) throw new Error('참가 중인 방이 없습니다.');
       room.nextRound(socketPlayerId(socket));
       publish(room);
+      scheduleOpeningNeutral(room);
       io.to(room.code).emit('nextRound', { round: room.round, startPlayerId: room.currentTurnPlayer()?.id });
       reply(callback, { ok: true });
     } catch (error) {
@@ -190,6 +190,7 @@ io.on('connection', (socket) => {
       if (!room) throw new Error('참가 중인 방이 없습니다.');
       room.restartGame(socketPlayerId(socket));
       publish(room);
+      scheduleOpeningNeutral(room);
       io.to(room.code).emit('gameRestarted');
       reply(callback, { ok: true });
     } catch (error) {

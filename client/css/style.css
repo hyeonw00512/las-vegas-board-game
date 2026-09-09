@@ -230,7 +230,8 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
   .scoreboard { position:static; }
   #score-players { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.4rem; }
   .score-row { min-width:0; border:1px solid var(--line); padding:.65rem; }
-  .game-log { display:none; }
+  .game-log { display:block; margin-top:.75rem; padding-top:.75rem; }
+  #game-log-list { max-height:120px; }
   .casino-board { grid-template-columns:repeat(2,minmax(0,1fr)); border-radius:30px 30px 10px 10px; padding:.65rem; }
   .casino-card { min-height:165px; }
   .dice-tray { grid-template-columns:1fr; }
@@ -252,6 +253,8 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
   .game-topbar { grid-template-columns:auto 1fr; }
   .room-actions { gap:.35rem; }
   .room-actions .topbar-rule { min-height:38px; padding:.3rem .5rem; }
+  .room-actions { display:none; }
+  .chat-toggle { top:max(.35rem,env(safe-area-inset-top)); right:max(.6rem,env(safe-area-inset-right)); bottom:auto; min-height:38px; padding:0 .7rem; }
   .turn-alert { min-height:38px; padding:.3rem 1rem; }
   .game-layout { grid-template-columns:145px minmax(0,1fr); gap:.5rem; padding:.5rem max(.6rem,env(safe-area-inset-right)) max(.5rem,env(safe-area-inset-bottom)) max(.6rem,env(safe-area-inset-left)); }
   .scoreboard { position:static; padding:.55rem; }

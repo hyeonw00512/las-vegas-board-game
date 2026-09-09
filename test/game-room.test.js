@@ -89,7 +89,7 @@ test('2인과 4인은 흰색 주사위 규칙에 맞게 나눠 갖는다', () =>
   assert.deepEqual(four.players.map((player) => player.remainingNeutralDice), [2, 2, 2, 2]);
 });
 
-test('3인은 선플레이어가 남은 흰색 주사위 2개를 사전 배치한다', () => {
+test('3인은 시스템이 남은 흰색 주사위 2개를 자동 배치한다', () => {
   const room = new GameRoom('THREE', socket('a'), 'A', 3);
   room.addPlayer(socket('b'), 'B');
   room.addPlayer(socket('c'), 'C');
@@ -97,11 +97,13 @@ test('3인은 선플레이어가 남은 흰색 주사위 2개를 사전 배치�
   room.start('a');
   assert.equal(room.openingNeutralPending, true);
   assert.throws(() => room.roll('a'), /중립 주사위/);
-  assert.throws(() => room.rollOpeningNeutral('b'), /현재 플레이어/);
-  const dice = room.rollOpeningNeutral('a');
+  assert.equal(room.turnDeadline, null);
+  const dice = room.assignOpeningNeutral();
   assert.equal(dice.length, 2);
   assert.equal(room.casinos.flatMap((casino) => casino.placedDice).filter((die) => die.isNeutral).length, 2);
   assert.equal(room.openingNeutralPending, false);
+  assert.equal(room.currentTurnPlayer().id, 'a');
+  assert.match(room.logs.at(-1).message, /시스템/);
 });
 
 test('지폐 54장을 섞고 카지노 1부터 6까지 순서대로 배분한다', () => {

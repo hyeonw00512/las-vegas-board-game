@@ -54,7 +54,7 @@ function turnPlayer() {
 }
 
 function isMyTurn() {
-  return turnPlayer()?.id === state.playerId && !state.room?.roundPlacementComplete;
+  return turnPlayer()?.id === state.playerId && !state.room?.roundPlacementComplete && !state.room?.openingNeutralPending;
 }
 
 function totalRemainingDice(player) {
@@ -186,8 +186,8 @@ function renderGame() {
     </article>
   `).join('');
   if (room.openingNeutralPending) {
-    $('#turn-label').textContent = isMyTurn() ? '3인 규칙 · 중립 주사위 사전 배치' : '선플레이어가 중립 주사위를 굴리는 중입니다';
-    $('#turn-player').textContent = isMyTurn() ? '흰색 주사위 2개를 굴려주세요' : `${turnPlayer()?.nickname ?? '선플레이어'}의 사전 배치`;
+    $('#turn-label').textContent = '3인 규칙 · 시스템 자동 처리';
+    $('#turn-player').textContent = '남는 주사위 배정 중…';
   } else if (room.roundPlacementComplete) {
     $('#turn-label').textContent = '모든 주사위 배치 완료';
     $('#turn-player').textContent = '라운드 정산 준비';
@@ -199,7 +199,7 @@ function renderGame() {
     $('#turn-player').textContent = `${turnPlayer()?.nickname ?? '플레이어'}의 차례`;
   }
   $('#turn-alert-action').textContent = room.openingNeutralPending
-    ? '흰색 주사위 2개를 굴려주세요'
+    ? '남는 주사위 배정 중…'
     : me?.dice.length ? '숫자를 선택하고 카지노에 배치하세요' : '주사위를 굴려주세요';
   renderDice(me);
   renderSettlement();
@@ -307,11 +307,11 @@ function renderDice(player) {
   state.lastDiceSignature = diceSignature;
   const openingNeutral = state.room?.openingNeutralPending;
   $('#roll-button').disabled = state.rolling || state.actionLocked || dice.length > 0 || !isMyTurn();
-  $('#roll-button').innerHTML = openingNeutral ? 'WHITE ROLL <span>중립 주사위 2개</span>' : 'ROLL <span>주사위 굴리기</span>';
+  $('#roll-button').innerHTML = openingNeutral ? 'WAIT <span>시스템 배정 중</span>' : 'ROLL <span>주사위 굴리기</span>';
   $('#dice-hint').textContent = state.room?.roundPlacementComplete
     ? '배치 완료'
     : openingNeutral
-      ? isMyTurn() ? '사전 배치 대기 중' : `${turnPlayer()?.nickname ?? ''} 진행 중`
+      ? '남는 주사위 배정 중…'
     : dice.length
       ? `${totalRemainingDice(player)}개 굴림 완료`
       : isMyTurn() ? `내 주사위 ${player?.remainingDice ?? 0} · 흰색 ${player?.remainingNeutralDice ?? 0}` : `${turnPlayer()?.nickname ?? ''} 차례`;
@@ -387,7 +387,7 @@ $('#roll-button').addEventListener('click', async () => {
   playSound('roll');
   $('#roll-button').disabled = true;
   errorAt('#game-error');
-  const response = await emit(state.room?.openingNeutralPending ? 'rollOpeningNeutral' : 'rollDice');
+  const response = await emit('rollDice');
   if (!response.ok) errorAt('#game-error', response.message);
   window.setTimeout(() => { state.rolling = false; }, 900);
 });
@@ -481,7 +481,7 @@ socket.on('dicePlaced', ({ roundPlacementComplete }) => {
   if (roundPlacementComplete) toast('모든 주사위 배치가 끝났습니다.');
 });
 
-socket.on('openingNeutralPlaced', ({ dice }) => toast(`흰색 주사위 ${dice.join(' · ')} 사전 배치`));
+socket.on('openingNeutralPlaced', ({ dice }) => toast(`시스템이 흰색 주사위 ${dice.join(' · ')} 자동 배치`));
 socket.on('nextRound', ({ round }) => { playSound('next'); toast(`${round}라운드를 시작합니다.`); });
 socket.on('gameRestarted', () => { playSound('next'); toast('새 게임을 시작합니다.'); });
 socket.on('turnTimedOut', () => toast('제한 시간이 끝나 서버가 자동으로 배치했습니다.'));
