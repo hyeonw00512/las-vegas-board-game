@@ -1,7 +1,18 @@
 const socket = io();
 const SESSION_KEY = 'lasVegasRoomSession';
-const state = { room: null, playerId: null, rolling: false, actionLocked: false, lastDiceSignature: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
+const state = { room: null, playerId: null, rolling: false, actionLocked: false, lastDiceSignature: '', lastPlacementActionId: '', lastTurnKey: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
 let audioContext;
+const SOUND_ASSETS = Object.freeze({
+  roll: '/sounds/dice-roll.mp3',
+  place: '/sounds/dice-place.mp3',
+  neutral: '/sounds/neutral-place.mp3',
+  round: '/sounds/round-result.mp3',
+  next: '/sounds/next-round.mp3',
+  win: '/sounds/victory.mp3',
+  turn: '/sounds/your-turn.mp3'
+});
+const soundPlayers = new Map();
+const unavailableSoundAssets = new Set();
 
 if (window.Phaser) {
   new window.Phaser.Game({
@@ -74,9 +85,42 @@ function toast(message) {
 
 function playSound(type) {
   if (!state.soundEnabled) return;
+  if (playSoundAsset(type)) return;
+  playFallbackTone(type);
+}
+
+function playSoundAsset(type) {
+  const source = SOUND_ASSETS[type];
+  if (!source || unavailableSoundAssets.has(type) || !window.Audio) return false;
+  let player = soundPlayers.get(type);
+  if (!player) {
+    player = new Audio(source);
+    player.preload = 'auto';
+    player.volume = type === 'turn' ? 0.58 : 0.46;
+    player.addEventListener('error', () => unavailableSoundAssets.add(type), { once: true });
+    soundPlayers.set(type, player);
+  }
+  try {
+    player.pause();
+    player.currentTime = 0;
+    const started = player.play();
+    if (started?.catch) {
+      started.catch(() => {
+        unavailableSoundAssets.add(type);
+        playFallbackTone(type);
+      });
+    }
+    return true;
+  } catch {
+    unavailableSoundAssets.add(type);
+    return false;
+  }
+}
+
+function playFallbackTone(type) {
   const notes = {
     roll: [170, 120, 155], place: [280, 430], round: [330, 440, 660],
-    next: [260, 390], win: [392, 523, 659, 784]
+    next: [260, 390], win: [392, 523, 659, 784], turn: [523, 659], neutral: [220, 330, 440]
   }[type] || [320];
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return;
@@ -87,10 +131,10 @@ function playSound(type) {
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
     const time = start + index * 0.075;
-    oscillator.type = type === 'roll' ? 'triangle' : 'sine';
+    oscillator.type = type === 'roll' ? 'triangle' : type === 'neutral' ? 'square' : 'sine';
     oscillator.frequency.setValueAtTime(frequency, time);
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(0.08, time + 0.012);
+    gain.gain.exponentialRampToValueAtTime(type === 'turn' ? 0.055 : 0.08, time + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.11);
     oscillator.connect(gain).connect(audioContext.destination);
     oscillator.start(time);
@@ -102,6 +146,7 @@ function renderSoundButton() {
   const button = $('#sound-toggle');
   button.textContent = `사운드 ${state.soundEnabled ? 'ON' : 'OFF'}`;
   button.setAttribute('aria-pressed', String(state.soundEnabled));
+  button.title = 'sounds 폴더에 음원 파일이 있으면 실제 음원을, 없으면 기본 효과음을 사용합니다.';
 }
 
 function emit(event, data = {}) {
@@ -120,7 +165,9 @@ function normalizeRoomCode(value) {
     return String(url.searchParams.get('room') || url.searchParams.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
   } catch {
     const inviteCode = text.match(/(?:^|[?&#])(?:room|code)=([^&#\s]+)/i)?.[1];
-    return decodeURIComponent(inviteCode || text).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+    let decoded = inviteCode || text;
+    try { decoded = decodeURIComponent(decoded); } catch { /* 이미 잘못 인코딩된 입력은 원문으로 처리 */ }
+    return decoded.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
   }
 }
 
@@ -161,6 +208,8 @@ function renderGame() {
   if (!room) return;
   const me = currentPlayer();
   const myTurn = isMyTurn();
+  const latestAction = room.lastPlacement ?? room.lastAction;
+  const isNewPlacement = Boolean((latestAction?.face || latestAction?.faces?.length) && latestAction.id !== state.lastPlacementActionId);
   $('#game-screen').classList.toggle('my-turn', myTurn);
   $('#turn-alert').classList.toggle('visible', myTurn);
   document.title = myTurn ? '🎲 내 차례 · 라스베가스' : '라스베가스';
@@ -178,19 +227,26 @@ function renderGame() {
   $('#game-log-list').innerHTML = [...(room.logs ?? [])].slice(-8).reverse().map((log) => `
     <div class="log-row ${log.type}"><i></i><span>${escapeHtml(log.message)}</span></div>
   `).join('');
-  $('#casino-board').innerHTML = [...room.casinos].sort((a, b) => a.number - b.number).map((casino) => `
-    <article class="casino-card casino-${casino.number} ${myTurn && me?.selectedFace === casino.number ? 'can-place' : ''}" data-casino="${casino.number}" role="button" tabindex="0" aria-label="${casino.number}번 카지노${myTurn && me?.selectedFace === casino.number ? ', 선택한 주사위 배치' : ''}" aria-disabled="${myTurn && me?.selectedFace === casino.number ? 'false' : 'true'}">
+  $('#casino-board').innerHTML = [...room.casinos].sort((a, b) => a.number - b.number).map((casino) => {
+    const wasPlaced = latestAction?.face === casino.number || latestAction?.faces?.includes(casino.number);
+    const placementClass = `${isNewPlacement && wasPlaced ? `just-placed ${latestAction?.openingNeutral ? 'neutral-arrival' : ''}` : ''} ${wasPlaced ? 'last-placement' : ''}`;
+    return `
+    <article class="casino-card casino-${casino.number} ${myTurn && me?.selectedFace === casino.number ? 'can-place' : ''} ${placementClass}" data-casino="${casino.number}" role="button" tabindex="0" aria-label="${casino.number}번 카지노${myTurn && me?.selectedFace === casino.number ? ', 선택한 주사위 배치' : ''}" aria-disabled="${myTurn && me?.selectedFace === casino.number ? 'false' : 'true'}">
       <div class="casino-number">${casino.number}</div>
       <div class="reward-stack">${casino.rewards.map((reward) => `<span>₩${reward}</span>`).join('')}</div>
       <div class="bet-zone">${renderPlacedDice(casino)}</div>
+      ${wasPlaced ? `<span class="last-placement-marker">${latestAction?.openingNeutral ? 'SYSTEM' : 'LAST BET'}</span>` : ''}
     </article>
-  `).join('');
+  `;
+  }).join('');
+  if (isNewPlacement) state.lastPlacementActionId = latestAction.id;
+  renderPlacementFlash(room);
   if (room.openingNeutralPending) {
     $('#turn-label').textContent = '3인 규칙 · 시스템 자동 처리';
     $('#turn-player').textContent = '남는 주사위 배정 중…';
   } else if (room.roundPlacementComplete) {
     $('#turn-label').textContent = '모든 주사위 배치 완료';
-    $('#turn-player').textContent = '라운드 정산 준비';
+    $('#turn-player').textContent = room.settlementPending ? '마지막 배치를 확인하는 중…' : '라운드 정산 준비';
   } else if (isMyTurn()) {
     $('#turn-label').textContent = me?.dice.length ? '같은 숫자는 한 번에 선택됩니다' : '당신의 차례입니다';
     $('#turn-player').textContent = me?.dice.length ? '배치할 숫자를 선택하세요' : '주사위를 굴려주세요';
@@ -200,6 +256,8 @@ function renderGame() {
   }
   $('#turn-alert-action').textContent = room.openingNeutralPending
     ? '남는 주사위 배정 중…'
+    : room.roundPlacementComplete && room.settlementPending
+      ? '마지막 배치와 판을 확인하세요'
     : me?.dice.length ? '숫자를 선택하고 카지노에 배치하세요' : '주사위를 굴려주세요';
   renderDice(me);
   renderSettlement();
@@ -247,6 +305,8 @@ function renderSettlement() {
   $('#settlement-kicker').textContent = gameOver ? 'FINAL RESULT' : 'ROUND RESULT';
   $('#settlement-title').textContent = gameOver ? '게임 종료' : `${room.round}라운드 정산`;
   $('#settlement-round').textContent = gameOver ? 'FINISH' : `${room.round} / ${room.settings.rounds}`;
+  renderRoundSummary(room);
+  renderSettlementBoard(room);
 
   if (gameOver) {
     $('#settlement-results').innerHTML = room.finalRanking.map((player, index) => `
@@ -282,6 +342,51 @@ function renderSettlement() {
   $('#final-actions').classList.toggle('hidden', !gameOver);
   $('#restart-game-button').classList.toggle('hidden', !gameOver || state.playerId !== room.hostId);
   $('#return-lobby-button').classList.toggle('hidden', !gameOver || state.playerId !== room.hostId);
+}
+
+function renderPlacementFlash(room) {
+  const element = $('#placement-flash');
+  const action = room.lastPlacement;
+  if (!action?.id) {
+    element.classList.add('hidden');
+    return;
+  }
+  const destinations = action.faces?.length ? [...new Set(action.faces)].join(' · ') : action.face;
+  const amount = action.count ? `주사위 ${action.count}개를 ` : '';
+  element.classList.remove('hidden');
+  element.classList.toggle('final-placement', Boolean(room.roundPlacementComplete && room.settlementPending));
+  element.innerHTML = `<span>${room.roundPlacementComplete && room.settlementPending ? 'FINAL BET' : 'LAST BET'}</span><b>${escapeHtml(action.nickname)}${action.openingNeutral ? '이' : '님이'} ${destinations}번 카지노에 ${amount}놓았습니다.</b>`;
+}
+
+function roundEarnings(room) {
+  const earnings = new Map(room.players.map((player) => [player.id, 0]));
+  for (const result of room.roundResults ?? []) {
+    for (const award of result.awards ?? []) {
+      if (!award.isNeutral) earnings.set(award.playerId, (earnings.get(award.playerId) ?? 0) + award.reward);
+    }
+  }
+  return earnings;
+}
+
+function renderRoundSummary(room) {
+  const action = room.lastPlacement;
+  const destinations = action?.faces?.length ? [...new Set(action.faces)].join(' · ') : action?.face;
+  const ending = action
+    ? `${escapeHtml(action.nickname)}${action.openingNeutral ? '이' : '님이'} ${destinations}번 카지노에 ${action.count ? `주사위 ${action.count}개를 ` : ''}놓으며 마무리되었습니다.`
+    : '모든 주사위 배치가 끝났습니다.';
+  const earnings = roundEarnings(room);
+  $('#round-summary').innerHTML = `
+    <p><span>ROUND RECAP</span><b>${room.round}라운드는 ${ending}</b></p>
+    <div class="round-earnings">${room.players.map((player) => `<span><i style="--player:${player.color}"></i>${escapeHtml(player.nickname)} <b>+₩${earnings.get(player.id) ?? 0}</b></span>`).join('')}</div>
+  `;
+}
+
+function renderSettlementBoard(room) {
+  const action = room.lastPlacement;
+  $('#settlement-board').innerHTML = [...room.casinos].sort((a, b) => a.number - b.number).map((casino) => {
+    const last = action?.face === casino.number || action?.faces?.includes(casino.number);
+    return `<article class="settlement-casino ${last ? 'was-last' : ''}"><b>${casino.number}</b><div>${casino.rewards.map((reward) => `<span>₩${reward}</span>`).join('')}</div><small>${renderPlacedDice(casino)}</small>${last ? '<em>LAST</em>' : ''}</article>`;
+  }).join('');
 }
 
 function renderPlacedDice(casino) {
@@ -437,6 +542,7 @@ $('#next-round-button').addEventListener('click', async () => {
 
 socket.on('roomState', (room) => {
   const previousStatus = state.room?.status;
+  const previousTurnKey = state.lastTurnKey;
   state.room = room;
   if (room.status !== 'LOBBY') {
     state.actionLocked = false;
@@ -444,6 +550,9 @@ socket.on('roomState', (room) => {
     renderGame();
     if (previousStatus === 'PLAYING' && room.status === 'ROUND_RESULT') playSound('round');
     if (previousStatus !== 'GAME_OVER' && room.status === 'GAME_OVER') playSound('win');
+    const turnKey = `${room.status}:${room.round}:${room.turnPlayerIndex}:${room.openingNeutralPending}`;
+    if (previousTurnKey && previousTurnKey !== turnKey && isMyTurn()) playSound('turn');
+    state.lastTurnKey = turnKey;
   } else {
     showScreen('#lobby-screen');
     renderLobby();
@@ -481,7 +590,7 @@ socket.on('dicePlaced', ({ roundPlacementComplete }) => {
   if (roundPlacementComplete) toast('모든 주사위 배치가 끝났습니다.');
 });
 
-socket.on('openingNeutralPlaced', ({ dice }) => toast(`시스템이 흰색 주사위 ${dice.join(' · ')} 자동 배치`));
+socket.on('openingNeutralPlaced', ({ dice }) => { playSound('neutral'); toast(`시스템이 흰색 주사위 ${dice.join(' · ')} 자동 배치`); });
 socket.on('nextRound', ({ round }) => { playSound('next'); toast(`${round}라운드를 시작합니다.`); });
 socket.on('gameRestarted', () => { playSound('next'); toast('새 게임을 시작합니다.'); });
 socket.on('turnTimedOut', () => toast('제한 시간이 끝나 서버가 자동으로 배치했습니다.'));

@@ -11,6 +11,7 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: false } });
 const rooms = new Map();
 const reconnectTimers = new Map();
+const settlementTimers = new Map();
 const RECONNECT_GRACE_MS = 60_000;
 const OPENING_NEUTRAL_DELAY_MS = 900;
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -29,7 +30,12 @@ function reply(callback, payload) {
 }
 
 function publish(room) {
-  io.to(room.code).emit('roomState', room.toJSON());
+  const socketIds = io.sockets.adapter.rooms.get(room.code);
+  if (!socketIds) return;
+  for (const socketId of socketIds) {
+    const target = io.sockets.sockets.get(socketId);
+    if (target) target.emit('roomState', room.toJSON(socketPlayerId(target)));
+  }
 }
 
 function scheduleOpeningNeutral(room) {
@@ -40,6 +46,19 @@ function scheduleOpeningNeutral(room) {
     publish(room);
     io.to(room.code).emit('openingNeutralPlaced', { dice });
   }, OPENING_NEUTRAL_DELAY_MS);
+}
+
+function scheduleRoundSettlement(room) {
+  if (!room.settlementPending || settlementTimers.has(room.code)) return;
+  const delay = Math.max(0, (room.settlementReadyAt || Date.now()) - Date.now());
+  const timer = setTimeout(() => {
+    settlementTimers.delete(room.code);
+    if (rooms.get(room.code) !== room || !room.settlementPending) return;
+    room.settleRound();
+    publish(room);
+    io.to(room.code).emit('roundSettled', { round: room.round, gameOver: room.status === 'GAME_OVER' });
+  }, delay);
+  settlementTimers.set(room.code, timer);
 }
 
 function findSocketRoom(socket) {
@@ -65,7 +84,7 @@ io.on('connection', (socket) => {
       socket.data.roomCode = code;
       socket.data.playerId = socket.id;
       const player = room.getPlayer(socket.id);
-      reply(callback, { ok: true, room: room.toJSON(), playerId: player.id, reconnectToken: player.reconnectToken });
+      reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id, reconnectToken: player.reconnectToken });
       publish(room);
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
@@ -81,7 +100,7 @@ io.on('connection', (socket) => {
       socket.join(normalizedCode);
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = player.id;
-      reply(callback, { ok: true, room: room.toJSON(), playerId: player.id, reconnectToken: player.reconnectToken });
+      reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id, reconnectToken: player.reconnectToken });
       publish(room);
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
@@ -100,7 +119,7 @@ io.on('connection', (socket) => {
       socket.join(normalizedCode);
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = player.id;
-      reply(callback, { ok: true, room: room.toJSON(), playerId: player.id });
+      reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id });
       publish(room);
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
@@ -164,6 +183,7 @@ io.on('connection', (socket) => {
       const result = room.placeDice(socketPlayerId(socket));
       io.to(room.code).emit('dicePlaced', result);
       publish(room);
+      if (result.roundPlacementComplete) scheduleRoundSettlement(room);
       reply(callback, { ok: true, ...result });
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
@@ -223,7 +243,10 @@ io.on('connection', (socket) => {
       socket.data.roomCode = null;
       socket.data.playerId = null;
       if (!room.players.some((player) => player.connected)) rooms.delete(room.code);
-      else publish(room);
+      else {
+        publish(room);
+        scheduleRoundSettlement(room);
+      }
       reply(callback, { ok: true });
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
@@ -258,7 +281,10 @@ io.on('connection', (socket) => {
       if (currentRoom.status === 'LOBBY') currentRoom.removePlayer(playerId);
       else currentRoom.abandonPlayer(playerId);
       if (!currentRoom.players.some((item) => item.connected)) rooms.delete(currentRoom.code);
-      else publish(currentRoom);
+      else {
+        publish(currentRoom);
+        scheduleRoundSettlement(currentRoom);
+      }
     }, RECONNECT_GRACE_MS));
   });
 });
@@ -270,6 +296,7 @@ setInterval(() => {
       if (!timedOut) continue;
       io.to(room.code).emit('turnTimedOut', timedOut);
       publish(room);
+      if (timedOut.roundPlacementComplete) scheduleRoundSettlement(room);
     } catch {
       // 다음 주기에서 상태를 다시 확인한다.
     }

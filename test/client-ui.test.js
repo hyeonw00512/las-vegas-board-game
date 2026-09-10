@@ -72,3 +72,27 @@ test('3인전 남는 주사위는 시스템 배정 상태를 표시한다', () =
   assert.doesNotMatch(script, /emit\(state\.room\?\.openingNeutralPending \? 'rollOpeningNeutral'/);
   assert.match(html, /시스템이 자동으로 굴려/);
 });
+
+test('배치와 내 차례에 맞춘 효과음과 칩 배치 효과를 제공한다', () => {
+  assert.match(script, /playSound\('turn'\)/);
+  assert.match(script, /playSound\('neutral'\)/);
+  assert.match(script, /const SOUND_ASSETS = Object\.freeze/);
+  assert.match(script, /your-turn\.mp3/);
+  assert.match(script, /function playSoundAsset\(type\)/);
+  assert.match(script, /function playFallbackTone\(type\)/);
+  assert.match(script, /just-placed/);
+  assert.match(styles, /@keyframes chip-drop/);
+  assert.match(styles, /\.casino-card\.just-placed/);
+});
+
+test('마지막 배치 확인과 라운드 수익 요약을 제공한다', () => {
+  for (const id of ['placement-flash', 'round-summary', 'settlement-board']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(script, /function renderPlacementFlash\(room\)/);
+  assert.match(script, /function renderRoundSummary\(room\)/);
+  assert.match(script, /function renderSettlementBoard\(room\)/);
+  assert.match(script, /room\.lastPlacement \?\? room\.lastAction/);
+  assert.match(styles, /\.casino-card\.last-placement/);
+  assert.match(styles, /\.round-earnings/);
+});

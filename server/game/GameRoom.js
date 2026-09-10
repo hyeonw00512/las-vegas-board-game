@@ -112,8 +112,7 @@ export class GameRoom {
     }
     if (this.status !== 'PLAYING' || this.roundPlacementComplete) return;
     if (this.players.every((item) => this.totalRemainingDice(item) === 0)) {
-      this.roundPlacementComplete = true;
-      this.settleRound();
+      this.completeRoundPlacement();
     } else if (this.currentTurnPlayer()?.id === playerId) {
       this.advanceTurn();
     }
@@ -150,8 +149,11 @@ export class GameRoom {
     this.status = 'PLAYING';
     this.turnPlayerIndex = this.startPlayerIndex;
     this.roundPlacementComplete = false;
+    this.settlementPending = false;
+    this.settlementReadyAt = null;
     this.roundResults = [];
     this.lastAction = null;
+    this.lastPlacement = null;
     this.casinos = Array.from({ length: 6 }, (_, index) => ({
       number: index + 1,
       rewards: dealRewards(this.rewardDeck),
@@ -236,11 +238,13 @@ export class GameRoom {
     }
     this.openingNeutralPending = false;
     this.lastAction = {
+      id: randomUUID(),
       playerId: NEUTRAL_ID,
       nickname: '시스템',
       openingNeutral: true,
       faces: dice
     };
+    this.lastPlacement = this.lastAction;
     this.addLog(`시스템이 남는 흰색 주사위 ${dice.join('·')}을 자동 배치했습니다.`, 'neutral');
     this.resetTurnDeadline();
     return dice;
@@ -290,16 +294,17 @@ export class GameRoom {
     player.dice = [];
     player.selectedFace = null;
     this.lastAction = {
+      id: randomUUID(),
       playerId: player.id,
       nickname: player.nickname,
       face,
       count
     };
+    this.lastPlacement = this.lastAction;
     this.addLog(`${player.nickname} → ${face}번 카지노에 주사위 ${count}개 배치`, 'place');
 
     if (this.players.every((item) => this.totalRemainingDice(item) === 0)) {
-      this.roundPlacementComplete = true;
-      this.settleRound();
+      this.completeRoundPlacement();
     } else {
       this.advanceTurn();
     }
@@ -321,6 +326,13 @@ export class GameRoom {
         return;
       }
     }
+  }
+
+  completeRoundPlacement() {
+    this.roundPlacementComplete = true;
+    this.settlementPending = true;
+    this.settlementReadyAt = Date.now() + 3500;
+    this.turnDeadline = null;
   }
 
   currentTurnPlayer() {
@@ -404,6 +416,8 @@ export class GameRoom {
     });
 
     this.turnDeadline = null;
+    this.settlementPending = false;
+    this.settlementReadyAt = null;
     this.status = this.round >= this.settings.rounds ? 'GAME_OVER' : 'ROUND_RESULT';
     this.lastAction = { roundSettled: true, round: this.round };
     this.addLog(`${this.round}라운드 정산이 완료되었습니다.`, 'settle');
@@ -449,7 +463,7 @@ export class GameRoom {
     this.logs = this.logs.slice(-80);
   }
 
-  toJSON() {
+  toJSON(viewerId) {
     return {
       code: this.code,
       hostId: this.hostId,
@@ -459,15 +473,21 @@ export class GameRoom {
       round: this.round,
       turnPlayerIndex: this.turnPlayerIndex,
       roundPlacementComplete: this.roundPlacementComplete,
+      settlementPending: this.settlementPending,
+      settlementReadyAt: this.settlementReadyAt,
       roundResults: this.roundResults,
       lastAction: this.lastAction,
+      lastPlacement: this.lastPlacement,
       openingNeutralPending: this.openingNeutralPending,
       rewardDeckCount: this.rewardDeck?.length ?? 0,
       turnDeadline: this.turnDeadline,
       finalRanking: this.status === 'GAME_OVER' ? this.finalRanking() : [],
       chatMessages: this.chatMessages,
       logs: this.logs,
-      players: this.players,
+      players: this.players.map((player) => ({
+        ...player,
+        dice: player.id === viewerId ? player.dice : []
+      })),
       casinos: this.casinos
     };
   }
