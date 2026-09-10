@@ -253,6 +253,29 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('forfeitGame', (_, callback) => {
+    try {
+      const room = findSocketRoom(socket);
+      if (!room) throw new Error('참가 중인 방이 없습니다.');
+      const playerId = socketPlayerId(socket);
+      const key = reconnectKey(room.code, playerId);
+      clearTimeout(reconnectTimers.get(key));
+      reconnectTimers.delete(key);
+      room.forfeitPlayer(playerId);
+      socket.leave(room.code);
+      socket.data.roomCode = null;
+      socket.data.playerId = null;
+      if (!room.players.some((player) => player.connected)) rooms.delete(room.code);
+      else {
+        publish(room);
+        scheduleRoundSettlement(room);
+      }
+      reply(callback, { ok: true });
+    } catch (error) {
+      reply(callback, { ok: false, message: error.message });
+    }
+  });
+
   socket.on('chatMessage', ({ message } = {}, callback) => {
     try {
       const room = findSocketRoom(socket);

@@ -217,7 +217,7 @@ function renderGame() {
   $('#round-total').textContent = room.settings.rounds;
   $('#game-code').textContent = room.code;
   $('#deck-count').textContent = room.rewardDeckCount;
-  $('#score-players').innerHTML = room.players.map((player) => `
+  $('#score-players').innerHTML = room.players.filter((player) => !player.abandoned).map((player) => `
     <article class="score-row ${player.id === state.playerId ? 'is-me' : ''} ${player.id === turnPlayer()?.id && !room.roundPlacementComplete ? 'is-turn' : ''} ${player.connected ? '' : 'offline'}">
       <span class="score-color" style="--player:${player.color}"></span>
       <div><b>${escapeHtml(player.nickname)}</b><small>${player.connected ? (player.id === state.playerId ? 'YOU' : 'PLAYER') : 'RECONNECTING'}</small></div>
@@ -359,7 +359,8 @@ function renderPlacementFlash(room) {
 }
 
 function roundEarnings(room) {
-  const earnings = new Map(room.players.map((player) => [player.id, 0]));
+  const activePlayers = room.players.filter((player) => !player.abandoned);
+  const earnings = new Map(activePlayers.map((player) => [player.id, 0]));
   for (const result of room.roundResults ?? []) {
     for (const award of result.awards ?? []) {
       if (!award.isNeutral) earnings.set(award.playerId, (earnings.get(award.playerId) ?? 0) + award.reward);
@@ -377,7 +378,7 @@ function renderRoundSummary(room) {
   const earnings = roundEarnings(room);
   $('#round-summary').innerHTML = `
     <p><span>ROUND RECAP</span><b>${room.round}라운드는 ${ending}</b></p>
-    <div class="round-earnings">${room.players.map((player) => `<span><i style="--player:${player.color}"></i>${escapeHtml(player.nickname)} <b>+₩${earnings.get(player.id) ?? 0}</b></span>`).join('')}</div>
+    <div class="round-earnings">${room.players.filter((player) => !player.abandoned).map((player) => `<span><i style="--player:${player.color}"></i>${escapeHtml(player.nickname)} <b>+₩${earnings.get(player.id) ?? 0}</b></span>`).join('')}</div>
   `;
 }
 
@@ -659,8 +660,21 @@ async function leaveRoom() {
   toast('방에서 나왔습니다.');
 }
 
+async function forfeitGame() {
+  if (!window.confirm('게임을 포기하시겠습니까?\n포기하면 현재 게임과 최종 순위에서 제외되며 되돌릴 수 없습니다.')) return;
+  const response = await emit('forfeitGame');
+  if (!response?.ok) return toast(response?.message || '게임을 포기하지 못했습니다.');
+  sessionStorage.removeItem(SESSION_KEY);
+  state.room = null;
+  state.playerId = null;
+  state.lastDiceSignature = '';
+  showScreen('#start-screen');
+  toast('게임을 포기했습니다. 남은 플레이어는 계속 진행합니다.');
+}
+
 $('#lobby-leave-button').addEventListener('click', leaveRoom);
 $('#leave-room-button').addEventListener('click', leaveRoom);
+$('#forfeit-button').addEventListener('click', forfeitGame);
 $('#restart-game-button').addEventListener('click', async () => {
   const response = await emit('restartGame');
   if (!response?.ok) toast(response?.message || '게임을 다시 시작하지 못했습니다.');

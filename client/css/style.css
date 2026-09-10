@@ -74,6 +74,8 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
 .turn-alert b { font-size:.9rem; }
 .orientation-hint { display:none; }
 .room-mini { justify-self:end; }
+.topbar-forfeit { border:1px solid rgba(255,77,109,.48); background:rgba(255,77,109,.08); color:#ff9aaa; }
+.topbar-forfeit:hover,.topbar-forfeit:focus-visible { border-color:var(--red); background:rgba(255,77,109,.18); color:#fff1f3; }
 .round-box { display:flex; align-items:baseline; gap:.35rem; }
 .round-box span { color:var(--muted); font-size:.65rem; letter-spacing:.16em; }
 .round-box b { color:var(--yellow); font-size:1.7rem; }
@@ -98,7 +100,7 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
 #game-log-list { display:grid; gap:.45rem; max-height:220px; overflow-y:auto; }
 .log-row { display:grid; grid-template-columns:6px 1fr; gap:.45rem; align-items:start; color:var(--muted); font-size:.65rem; line-height:1.4; }
 .log-row i { width:5px; height:5px; margin-top:.28rem; border-radius:50%; background:var(--green); }
-.log-row.timeout i { background:var(--red); }
+.log-row.timeout i,.log-row.forfeit i { background:var(--red); }
 .table-heading { display:flex; justify-content:space-between; align-items:center; margin:0 0 1rem; }
 .table-heading span { color:var(--muted); font-size:.75rem; }
 .table-heading h2 { margin:.25rem 0 0; font-size:1.25rem; }
@@ -147,7 +149,7 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
 .placement-flash.final-placement { border-color:var(--green); background:rgba(66,245,164,.12); animation:final-placement-pulse .8s ease-in-out infinite alternate; }
 .casino-card { position:relative; }
 .casino-card.last-placement { border-color:rgba(245,223,91,.8); box-shadow:0 0 0 2px rgba(245,223,91,.16),0 0 25px rgba(245,223,91,.2); }
-.last-placement-marker { position:absolute; top:.35rem; right:.35rem; padding:.18rem .3rem; background:var(--yellow); color:#181605; font-size:.5rem; font-weight:900; letter-spacing:.08em; }
+.last-placement-marker { position:absolute; top:50%; left:50%; z-index:3; min-width:64px; padding:.28rem .42rem; transform:translate(-50%,-50%); background:var(--yellow); color:#181605; box-shadow:0 3px 12px rgba(0,0,0,.42); font-size:.62rem; font-weight:900; letter-spacing:.1em; line-height:1; text-align:center; white-space:nowrap; pointer-events:none; }
 .chat-panel { align-self:start; position:sticky; top:1.5rem; height:calc(100vh - 108px); height:calc(100dvh - 108px); min-height:480px; display:grid; grid-template-rows:auto 1fr auto auto; padding:1rem; border:1px solid var(--line); background:var(--panel); box-shadow:0 26px 80px rgba(0,0,0,.3); }
 .chat-heading { display:flex; align-items:flex-start; justify-content:space-between; padding-bottom:.8rem; border-bottom:1px solid var(--line); }
 .chat-heading span { color:var(--green); font-size:.58rem; font-weight:800; letter-spacing:.17em; }

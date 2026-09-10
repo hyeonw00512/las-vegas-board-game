@@ -96,3 +96,11 @@ test('마지막 배치 확인과 라운드 수익 요약을 제공한다', () =>
   assert.match(styles, /\.casino-card\.last-placement/);
   assert.match(styles, /\.round-earnings/);
 });
+
+test('진행 중 게임 포기와 제외 처리를 제공한다', () => {
+  assert.match(html, /id="forfeit-button"/);
+  assert.match(script, /function forfeitGame\(\)/);
+  assert.match(script, /emit\('forfeitGame'\)/);
+  assert.match(script, /filter\(\(player\) => !player\.abandoned\)/);
+  assert.match(styles, /\.topbar-forfeit/);
+});

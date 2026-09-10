@@ -230,6 +230,15 @@ export class GameRoom {
     this.removePlayer(playerId);
   }
 
+  forfeitPlayer(playerId) {
+    if (this.status !== 'PLAYING') throw new Error('진행 중인 게임에서만 포기할 수 있습니다.');
+    const player = this.getPlayer(playerId);
+    if (!player || player.abandoned) throw new Error('포기할 플레이어를 찾을 수 없습니다.');
+    player.connected = false;
+    this.addLog(`${player.nickname}님이 게임을 포기했습니다.`, 'forfeit');
+    this.abandonPlayer(playerId);
+  }
+
   assignOpeningNeutral() {
     if (!this.openingNeutralPending) throw new Error('사전 배치할 중립 주사위가 없습니다.');
     const dice = Array.from({ length: 2 }, () => randomInt(1, 7));
@@ -425,7 +434,7 @@ export class GameRoom {
   }
 
   finalRanking() {
-    return [...this.players]
+    return this.players.filter((player) => !player.abandoned)
       .sort((a, b) => b.money - a.money)
       .map((player, index) => ({
         rank: index + 1,

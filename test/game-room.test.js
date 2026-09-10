@@ -267,6 +267,20 @@ test('진행 중 방장이 나가면 다음 연결 참가자에게 방장을 넘
   assert.equal(room.currentTurnPlayer().id, 'b');
 });
 
+test('게임 포기자는 경쟁과 최종 순위에서 즉시 제외된다', () => {
+  const room = new GameRoom('QUITR', socket('a'), 'A', 2);
+  room.addPlayer(socket('b'), 'B');
+  room.toggleReady('a'); room.toggleReady('b'); room.start('a');
+  room.getPlayer('a').money = 90;
+  room.forfeitPlayer('a');
+  assert.equal(room.getPlayer('a').abandoned, true);
+  assert.equal(room.getPlayer('a').remainingDice, 0);
+  assert.equal(room.hostId, 'b');
+  room.status = 'GAME_OVER';
+  assert.deepEqual(room.finalRanking().map((player) => player.playerId), ['b']);
+  assert.match(room.logs.at(-1).message, /게임을 포기/);
+});
+
 test('방 설정값을 허용 범위로 정리해 게임에 적용한다', () => {
   const room = new GameRoom('RULES', socket('a'), 'A', { maxPlayers: 3, diceCount: 10, rounds: 6, turnSeconds: 45 });
   room.addPlayer(socket('b'), 'B');
