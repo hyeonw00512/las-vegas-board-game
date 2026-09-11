@@ -272,10 +272,17 @@ test('게임 포기자는 경쟁과 최종 순위에서 즉시 제외된다', ()
   room.addPlayer(socket('b'), 'B');
   room.toggleReady('a'); room.toggleReady('b'); room.start('a');
   room.getPlayer('a').money = 90;
+  room.casinos[0].placedDice = [
+    room.makePlacedDie(room.getPlayer('a'), false),
+    room.makePlacedDie(room.getPlayer('b'), false),
+    room.makePlacedDie(null, true)
+  ];
   room.forfeitPlayer('a');
   assert.equal(room.getPlayer('a').abandoned, true);
   assert.equal(room.getPlayer('a').remainingDice, 0);
   assert.equal(room.hostId, 'b');
+  assert.equal(room.casinos[0].placedDice.some((die) => die.playerId === 'a'), false);
+  assert.equal(room.casinos[0].placedDice.filter((die) => die.isNeutral).length, 1);
   room.status = 'GAME_OVER';
   assert.deepEqual(room.finalRanking().map((player) => player.playerId), ['b']);
   assert.match(room.logs.at(-1).message, /게임을 포기/);

@@ -235,6 +235,9 @@ export class GameRoom {
     const player = this.getPlayer(playerId);
     if (!player || player.abandoned) throw new Error('포기할 플레이어를 찾을 수 없습니다.');
     player.connected = false;
+    for (const casino of this.casinos) {
+      casino.placedDice = casino.placedDice.filter((die) => die.playerId !== playerId);
+    }
     this.addLog(`${player.nickname}님이 게임을 포기했습니다.`, 'forfeit');
     this.abandonPlayer(playerId);
   }

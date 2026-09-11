@@ -400,7 +400,7 @@ function renderPlacedDice(casino) {
   }, new Map());
   return [...groups.values()].map((group) => `
     <span class="placed-group" title="${escapeHtml(group.nickname)} 주사위 ${group.count}개">
-      <i style="--player:${group.color}"></i><b>${group.count}</b>
+      <span class="board-die ${group.isNeutral ? 'neutral-board-die' : ''}" style="--die:${group.isNeutral ? '#f4f1e8' : group.color}" aria-hidden="true">${pipMarkup(group.face)}</span><b>×${group.count}</b>
     </span>
   `).join('');
 }
@@ -408,6 +408,7 @@ function renderPlacedDice(casino) {
 function renderDice(player) {
   const row = $('#dice-row');
   const dice = player?.dice ?? [];
+  const selectedCount = dice.filter((die) => die.face === player?.selectedFace).length;
   const diceSignature = dice.map((die) => `${die.face}${die.isNeutral ? 'N' : 'P'}`).join('-');
   const shouldAnimate = Boolean(diceSignature) && diceSignature !== state.lastDiceSignature;
   state.lastDiceSignature = diceSignature;
@@ -421,6 +422,9 @@ function renderDice(player) {
     : dice.length
       ? `${totalRemainingDice(player)}개 굴림 완료`
       : isMyTurn() ? `내 주사위 ${player?.remainingDice ?? 0} · 흰색 ${player?.remainingNeutralDice ?? 0}` : `${turnPlayer()?.nickname ?? ''} 차례`;
+  $('#selection-summary').textContent = selectedCount
+    ? `${player.selectedFace} 눈 주사위 ${selectedCount}개 선택됨 · ${player.selectedFace}번 카지노에 배치`
+    : dice.length ? '주사위 하나를 누르면 같은 눈이 함께 선택됩니다.' : '주사위를 굴려 다음 수를 선택하세요.';
   if (!dice.length) {
     const waitingCount = Math.min(10, Math.max(1, totalRemainingDice(player) || state.room?.settings.diceCount || 8));
     row.innerHTML = `<span class="empty-dice">${Array.from({ length: waitingCount }, () => '•').join(' ')}</span>`;
@@ -431,7 +435,6 @@ function renderDice(player) {
       </button>
     `).join('');
   }
-  const selectedCount = dice.filter((die) => die.face === player?.selectedFace).length;
   const placeButton = $('#place-button');
   placeButton.classList.toggle('hidden', !selectedCount || !isMyTurn());
   placeButton.disabled = state.actionLocked || !isMyTurn();

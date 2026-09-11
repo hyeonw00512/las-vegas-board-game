@@ -43,7 +43,7 @@ test('모바일 안전 영역과 키보드 접근성을 제공한다', () => {
   assert.match(styles, /100dvh/);
   assert.match(styles, /safe-area-inset-bottom/);
   assert.match(styles, /prefers-reduced-motion:reduce/);
-  assert.match(styles, /\.die \{ width:44px; height:44px;/);
+  assert.match(styles, /\.die \{ width:54px; height:54px;/);
 });
 
 test('내 차례 강조와 모바일 가로 화면 안내를 제공한다', () => {
@@ -103,4 +103,20 @@ test('진행 중 게임 포기와 제외 처리를 제공한다', () => {
   assert.match(script, /emit\('forfeitGame'\)/);
   assert.match(script, /filter\(\(player\) => !player\.abandoned\)/);
   assert.match(styles, /\.topbar-forfeit/);
+  assert.match(styles, /\.room-actions \.topbar-rule \{ display:none; \}/);
+});
+
+test('큰 주사위와 선택 안내로 주사위 조작을 명확하게 한다', () => {
+  assert.match(html, /id="selection-summary"/);
+  assert.match(script, /눈 주사위 \$\{selectedCount\}개 선택됨/);
+  assert.match(styles, /\.die \{ flex:0 0 auto; width:60px; height:60px;/);
+  assert.match(styles, /\.face i \{ width:11px; height:11px;/);
+  assert.match(styles, /\.die\.selected \{ border-color:var\(--yellow\); transform:translateY\(-7px\) scale\(1\.06\)/);
+});
+
+test('카지노 판 위 배치 주사위도 눈금과 색상으로 구분한다', () => {
+  assert.match(script, /class="board-die/);
+  assert.match(script, /pipMarkup\(group\.face\)/);
+  assert.match(styles, /\.board-die \{[^}]*width:34px; height:34px;/);
+  assert.match(styles, /\.board-die \.face i \{ width:6px; height:6px;/);
 });
