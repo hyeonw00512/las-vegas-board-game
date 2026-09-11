@@ -246,7 +246,7 @@ export class GameRoom {
     if (!this.openingNeutralPending) throw new Error('사전 배치할 중립 주사위가 없습니다.');
     const dice = Array.from({ length: 2 }, () => randomInt(1, 7));
     for (const face of dice) {
-      this.casinos[face - 1].placedDice.push(this.makePlacedDie(null, true));
+      this.casinos[face - 1].placedDice.push(this.makePlacedDie(null, true, face));
     }
     this.openingNeutralPending = false;
     this.lastAction = {
@@ -300,7 +300,7 @@ export class GameRoom {
     const casino = this.casinos.find((item) => item.number === face);
     if (!casino) throw new Error('배치할 장소를 찾을 수 없습니다.');
 
-    casino.placedDice.push(...selectedDice.map((die) => this.makePlacedDie(player, die.isNeutral)));
+    casino.placedDice.push(...selectedDice.map((die) => this.makePlacedDie(player, die.isNeutral, die.face)));
     player.remainingDice -= selectedDice.filter((die) => !die.isNeutral).length;
     player.remainingNeutralDice -= selectedDice.filter((die) => die.isNeutral).length;
     player.dice = [];
@@ -377,10 +377,10 @@ export class GameRoom {
     return player.remainingDice + player.remainingNeutralDice;
   }
 
-  makePlacedDie(player, isNeutral) {
+  makePlacedDie(player, isNeutral, face) {
     return isNeutral
-      ? { playerId: NEUTRAL_ID, nickname: '중립', color: NEUTRAL_COLOR, isNeutral: true }
-      : { playerId: player.id, nickname: player.nickname, color: player.color, isNeutral: false };
+      ? { playerId: NEUTRAL_ID, nickname: '중립', color: NEUTRAL_COLOR, isNeutral: true, face }
+      : { playerId: player.id, nickname: player.nickname, color: player.color, isNeutral: false, face };
   }
 
   settleRound() {

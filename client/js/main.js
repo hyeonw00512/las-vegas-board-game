@@ -400,7 +400,7 @@ function renderPlacedDice(casino) {
   }, new Map());
   return [...groups.values()].map((group) => `
     <span class="placed-group" title="${escapeHtml(group.nickname)} 주사위 ${group.count}개">
-      <span class="board-die ${group.isNeutral ? 'neutral-board-die' : ''}" style="--die:${group.isNeutral ? '#f4f1e8' : group.color}" aria-hidden="true">${pipMarkup(group.face)}</span><b>×${group.count}</b>
+      <span class="board-die ${group.isNeutral ? 'neutral-board-die' : ''}" style="--die:${group.isNeutral ? '#f4f1e8' : group.color}" aria-hidden="true">${pipMarkup(group.face ?? casino.number)}</span><b>×${group.count}</b>
     </span>
   `).join('');
 }

@@ -125,6 +125,19 @@ test('3인은 시스템이 남은 흰색 주사위 2개를 자동 배치한다',
   assert.match(room.logs.at(-1).message, /시스템/);
 });
 
+test('배치된 주사위는 판 위 눈금 표시를 위해 나온 숫자를 보존한다', () => {
+  const room = new GameRoom('FACE4', socket('a'), 'A', 2);
+  room.addPlayer(socket('b'), 'B');
+  room.toggleReady('a'); room.toggleReady('b'); room.start('a');
+  const player = room.currentTurnPlayer();
+  player.dice = [{ face: 4, isNeutral: false }];
+  player.selectedFace = 4;
+
+  room.placeDice(player.id);
+
+  assert.equal(room.casinos[3].placedDice[0].face, 4);
+});
+
 test('지폐 54장을 섞고 카지노 1부터 6까지 순서대로 배분한다', () => {
   const room = new GameRoom('MONEY', socket('a'), 'A', 2);
   room.addPlayer(socket('b'), 'B');

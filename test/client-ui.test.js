@@ -116,7 +116,7 @@ test('큰 주사위와 선택 안내로 주사위 조작을 명확하게 한다'
 
 test('카지노 판 위 배치 주사위도 눈금과 색상으로 구분한다', () => {
   assert.match(script, /class="board-die/);
-  assert.match(script, /pipMarkup\(group\.face\)/);
+  assert.match(script, /pipMarkup\(group\.face \?\? casino\.number\)/);
   assert.match(styles, /\.board-die \{[^}]*width:34px; height:34px;/);
   assert.match(styles, /\.board-die \.face i \{ width:6px; height:6px;/);
 });
