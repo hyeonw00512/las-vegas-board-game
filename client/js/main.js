@@ -230,11 +230,12 @@ function renderGame() {
   $('#casino-board').innerHTML = [...room.casinos].sort((a, b) => a.number - b.number).map((casino) => {
     const wasPlaced = latestAction?.face === casino.number || latestAction?.faces?.includes(casino.number);
     const placementClass = `${isNewPlacement && wasPlaced ? `just-placed ${latestAction?.openingNeutral ? 'neutral-arrival' : ''}` : ''} ${wasPlaced ? 'last-placement' : ''}`;
+    const bettorCount = new Set(casino.placedDice.map((die) => die.playerId)).size;
     return `
-    <article class="casino-card casino-${casino.number} ${myTurn && me?.selectedFace === casino.number ? 'can-place' : ''} ${placementClass}" data-casino="${casino.number}" role="button" tabindex="0" aria-label="${casino.number}번 카지노${myTurn && me?.selectedFace === casino.number ? ', 선택한 주사위 배치' : ''}" aria-disabled="${myTurn && me?.selectedFace === casino.number ? 'false' : 'true'}">
+    <article class="casino-card casino-${casino.number} ${bettorCount >= 4 ? 'crowded-bets' : ''} ${myTurn && me?.selectedFace === casino.number ? 'can-place' : ''} ${placementClass}" data-casino="${casino.number}" role="button" tabindex="0" aria-label="${casino.number}번 카지노${myTurn && me?.selectedFace === casino.number ? ', 선택한 주사위 배치' : ''}" aria-disabled="${myTurn && me?.selectedFace === casino.number ? 'false' : 'true'}">
       <div class="casino-number">${casino.number}</div>
       <div class="reward-stack">${casino.rewards.map((reward) => `<span>₩${reward}</span>`).join('')}</div>
-      <div class="bet-zone">${renderPlacedDice(casino)}</div>
+      <div class="bet-zone bettors-${bettorCount}">${renderPlacedDice(casino)}</div>
       ${wasPlaced ? `<span class="last-placement-marker">${latestAction?.openingNeutral ? 'SYSTEM' : 'LAST BET'}</span>` : ''}
     </article>
   `;

@@ -123,9 +123,11 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
 .casino-number { position:absolute; left:.75rem; top:.3rem; font:900 4.5rem/1 Inter; color:rgba(255,255,255,.07); }
 .reward-stack { min-height:76px; display:flex; align-items:flex-start; justify-content:flex-end; gap:.35rem; flex-wrap:wrap; position:relative; z-index:1; }
 .reward-stack span { display:inline-grid; place-items:center; width:58px; height:34px; border:1px solid rgba(245,223,91,.72); outline:1px dashed rgba(245,223,91,.32); outline-offset:-4px; background:linear-gradient(135deg,#1f3528,#14251c); color:var(--yellow); font-size:.66rem; font-weight:900; box-shadow:3px 3px 0 rgba(0,0,0,.2),0 0 12px rgba(245,223,91,.08); transform:rotate(-2deg); }
-.bet-zone { position:absolute; left:1rem; right:1rem; bottom:1rem; min-height:66px; border:1px dashed rgba(255,255,255,.13); display:flex; align-items:center; justify-content:center; gap:.55rem; flex-wrap:wrap; padding:.45rem; }
+.casino-card.crowded-bets { min-height:222px; }
+.bet-zone { position:absolute; left:1rem; right:1rem; bottom:1rem; min-height:66px; border:1px dashed rgba(255,255,255,.13); display:grid; grid-template-columns:repeat(auto-fit,minmax(54px,1fr)); align-content:center; gap:.35rem; padding:.45rem; }
+.bet-zone.bettors-4,.bet-zone.bettors-5 { min-height:94px; }
 .bet-zone small { color:rgba(255,255,255,.22); letter-spacing:.15em; font-size:.58rem; }
-.placed-group { display:inline-flex; align-items:center; gap:.38rem; padding:.3rem .45rem; background:rgba(0,0,0,.32); border:1px solid var(--line); font-size:.78rem; }
+.placed-group { display:inline-flex; min-width:0; align-items:center; justify-content:center; gap:.38rem; padding:.3rem .45rem; background:rgba(0,0,0,.32); border:1px solid var(--line); font-size:.78rem; }
 .board-die { flex:0 0 auto; display:block; width:34px; height:34px; padding:4px; background:var(--die,#e9ecdf); border:2px solid rgba(255,255,255,.5); border-radius:7px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.16),0 3px 8px rgba(0,0,0,.35); }
 .board-die .face i { width:6px; height:6px; }
 .neutral-board-die { border-color:#fff; }
@@ -309,13 +311,19 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
   .live-pill { display:none; }
   .casino-board { grid-template-columns:repeat(3,minmax(0,1fr)); gap:.35rem; padding:.45rem; border-radius:26px 26px 8px 8px; }
   .casino-card { min-height:112px; padding:.45rem; }
+  .casino-card.crowded-bets { min-height:158px; }
   .casino-number { font-size:3rem; }
   .reward-stack { min-height:45px; gap:.2rem; }
   .reward-stack span { width:42px; height:24px; font-size:.52rem; }
   .bet-zone { left:.45rem; right:.45rem; bottom:.45rem; min-height:40px; padding:.25rem; gap:.25rem; }
+  .bet-zone.bettors-4,.bet-zone.bettors-5 { min-height:74px; grid-template-columns:repeat(3,minmax(0,1fr)); }
   .placed-group { gap:.26rem; padding:.18rem .28rem; font-size:.66rem; }
   .board-die { width:28px; height:28px; padding:3px; border-radius:6px; }
   .board-die .face i { width:5px; height:5px; }
+  .crowded-bets .placed-group { gap:.14rem; padding:.13rem .18rem; font-size:.56rem; }
+  .crowded-bets .board-die { width:20px; height:20px; padding:2px; border-radius:4px; }
+  .crowded-bets .board-die .face i { width:3px; height:3px; }
+  .crowded-bets .placed-group b { min-width:0; }
   .dice-tray { grid-template-columns:86px minmax(0,1fr) 125px; gap:.45rem; min-height:66px; margin-top:.4rem; padding:.4rem; }
   .tray-copy small { display:none; }
   .dice-row { min-height:46px; gap:.25rem; }
@@ -334,10 +342,16 @@ input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(66,245,164,.0
   .round-box { justify-self:start; }
   .casino-board { gap:.45rem; }
   .casino-card { min-height:150px; padding:.65rem; }
+  .casino-card.crowded-bets { min-height:185px; }
   .reward-stack span { width:48px; height:29px; font-size:.58rem; }
   .bet-zone { left:.65rem; right:.65rem; bottom:.65rem; min-height:53px; }
+  .bet-zone.bettors-4,.bet-zone.bettors-5 { min-height:82px; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; padding:.2rem; }
   .board-die { width:32px; height:32px; padding:4px; }
   .board-die .face i { width:6px; height:6px; }
+  .crowded-bets .placed-group { gap:.12rem; padding:.12rem .16rem; font-size:.56rem; }
+  .crowded-bets .board-die { width:22px; height:22px; padding:2px; border-radius:4px; }
+  .crowded-bets .board-die .face i { width:3px; height:3px; }
+  .crowded-bets .placed-group b { min-width:0; }
   .dice-tray { padding:.8rem; }
   .die { width:54px; height:54px; padding:6px; }
   .face i { width:10px; height:10px; }

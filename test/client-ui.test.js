@@ -120,3 +120,10 @@ test('카지노 판 위 배치 주사위도 눈금과 색상으로 구분한다'
   assert.match(styles, /\.board-die \{[^}]*width:34px; height:34px;/);
   assert.match(styles, /\.board-die \.face i \{ width:6px; height:6px;/);
 });
+
+test('많은 플레이어가 같은 카지노에 배팅해도 모든 표시를 확장한다', () => {
+  assert.match(script, /const bettorCount = new Set\(casino\.placedDice\.map/);
+  assert.match(script, /bettors-\$\{bettorCount\}/);
+  assert.match(styles, /\.casino-card\.crowded-bets/);
+  assert.match(styles, /\.bet-zone\.bettors-4,\.bet-zone\.bettors-5/);
+});
