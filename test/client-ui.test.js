@@ -127,3 +127,18 @@ test('많은 플레이어가 같은 카지노에 배팅해도 모든 표시를 �
   assert.match(styles, /\.casino-card\.crowded-bets/);
   assert.match(styles, /\.bet-zone\.bettors-4,\.bet-zone\.bettors-5/);
 });
+
+test('카지노 배팅 표시는 같은 눈을 많이 건 플레이어부터 정렬한다', () => {
+  assert.match(script, /groups\.values\(\)\]\.sort\(\(left, right\) => right\.count - left\.count\)/);
+});
+
+test('마지막 배치에서 색 주사위와 흰색 주사위 수를 구분해 안내한다', () => {
+  assert.match(script, /function placedDiceDescription\(action\)/);
+  assert.match(script, /색 주사위 \$\{action\.playerDiceCount\}개/);
+  assert.match(script, /흰색 주사위 \$\{action\.neutralDiceCount\}개/);
+});
+
+test('마지막 배치 배지는 배팅 주사위 영역을 가리지 않는다', () => {
+  assert.match(styles, /\.last-placement-marker \{ position:absolute; top:\.55rem; left:\.55rem;/);
+  assert.doesNotMatch(styles, /\.last-placement-marker \{ position:absolute; top:50%; left:50%;/);
+});

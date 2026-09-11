@@ -353,10 +353,19 @@ function renderPlacementFlash(room) {
     return;
   }
   const destinations = action.faces?.length ? [...new Set(action.faces)].join(' · ') : action.face;
-  const amount = action.count ? `주사위 ${action.count}개를 ` : '';
+  const amount = placedDiceDescription(action);
   element.classList.remove('hidden');
   element.classList.toggle('final-placement', Boolean(room.roundPlacementComplete && room.settlementPending));
-  element.innerHTML = `<span>${room.roundPlacementComplete && room.settlementPending ? 'FINAL BET' : 'LAST BET'}</span><b>${escapeHtml(action.nickname)}${action.openingNeutral ? '이' : '님이'} ${destinations}번 카지노에 ${amount}놓았습니다.</b>`;
+  element.innerHTML = `<span>${room.roundPlacementComplete && room.settlementPending ? 'FINAL BET' : 'LAST BET'}</span><b>${escapeHtml(action.nickname)}${action.openingNeutral ? '이' : '님이'} ${destinations}번 카지노에 ${amount} 놓았습니다.</b>`;
+}
+
+function placedDiceDescription(action) {
+  if (action.openingNeutral) return `흰색 주사위 ${action.faces?.length ?? 0}개를`;
+  const details = [
+    action.playerDiceCount ? `색 주사위 ${action.playerDiceCount}개` : '',
+    action.neutralDiceCount ? `흰색 주사위 ${action.neutralDiceCount}개` : ''
+  ].filter(Boolean);
+  return details.length ? `${details.join(' · ')}를` : action.count ? `주사위 ${action.count}개를` : '';
 }
 
 function roundEarnings(room) {
@@ -374,7 +383,7 @@ function renderRoundSummary(room) {
   const action = room.lastPlacement;
   const destinations = action?.faces?.length ? [...new Set(action.faces)].join(' · ') : action?.face;
   const ending = action
-    ? `${escapeHtml(action.nickname)}${action.openingNeutral ? '이' : '님이'} ${destinations}번 카지노에 ${action.count ? `주사위 ${action.count}개를 ` : ''}놓으며 마무리되었습니다.`
+    ? `${escapeHtml(action.nickname)}${action.openingNeutral ? '이' : '님이'} ${destinations}번 카지노에 ${placedDiceDescription(action)} 놓으며 마무리되었습니다.`
     : '모든 주사위 배치가 끝났습니다.';
   const earnings = roundEarnings(room);
   $('#round-summary').innerHTML = `
@@ -399,7 +408,7 @@ function renderPlacedDice(casino) {
     result.set(die.playerId, current);
     return result;
   }, new Map());
-  return [...groups.values()].map((group) => `
+  return [...groups.values()].sort((left, right) => right.count - left.count).map((group) => `
     <span class="placed-group" title="${escapeHtml(group.nickname)} 주사위 ${group.count}개">
       <span class="board-die ${group.isNeutral ? 'neutral-board-die' : ''}" style="--die:${group.isNeutral ? '#f4f1e8' : group.color}" aria-hidden="true">${pipMarkup(group.face ?? casino.number)}</span><b>×${group.count}</b>
     </span>

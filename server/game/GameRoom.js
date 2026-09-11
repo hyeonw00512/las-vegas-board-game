@@ -296,13 +296,15 @@ export class GameRoom {
     const face = player.selectedFace;
     const selectedDice = player.dice.filter((die) => die.face === face);
     const count = selectedDice.length;
+    const playerDiceCount = selectedDice.filter((die) => !die.isNeutral).length;
+    const neutralDiceCount = selectedDice.filter((die) => die.isNeutral).length;
     if (!count) throw new Error('선택한 주사위가 없습니다.');
     const casino = this.casinos.find((item) => item.number === face);
     if (!casino) throw new Error('배치할 장소를 찾을 수 없습니다.');
 
     casino.placedDice.push(...selectedDice.map((die) => this.makePlacedDie(player, die.isNeutral, die.face)));
-    player.remainingDice -= selectedDice.filter((die) => !die.isNeutral).length;
-    player.remainingNeutralDice -= selectedDice.filter((die) => die.isNeutral).length;
+    player.remainingDice -= playerDiceCount;
+    player.remainingNeutralDice -= neutralDiceCount;
     player.dice = [];
     player.selectedFace = null;
     this.lastAction = {
@@ -310,10 +312,13 @@ export class GameRoom {
       playerId: player.id,
       nickname: player.nickname,
       face,
-      count
+      count,
+      playerDiceCount,
+      neutralDiceCount
     };
     this.lastPlacement = this.lastAction;
-    this.addLog(`${player.nickname} → ${face}번 카지노에 주사위 ${count}개 배치`, 'place');
+    const diceDetail = [playerDiceCount && `색 주사위 ${playerDiceCount}개`, neutralDiceCount && `흰색 주사위 ${neutralDiceCount}개`].filter(Boolean).join(' · ');
+    this.addLog(`${player.nickname} → ${face}번 카지노에 ${diceDetail} 배치`, 'place');
 
     if (this.players.every((item) => this.totalRemainingDice(item) === 0)) {
       this.completeRoundPlacement();
@@ -324,6 +329,8 @@ export class GameRoom {
     return {
       face,
       count,
+      playerDiceCount,
+      neutralDiceCount,
       roundPlacementComplete: this.roundPlacementComplete,
       nextTurnPlayerId: this.roundPlacementComplete ? null : this.currentTurnPlayer()?.id
     };

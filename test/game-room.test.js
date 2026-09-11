@@ -46,6 +46,10 @@ test('주사위 굴림과 숫자 묶음 선택은 서버가 검증한다', () =>
   const selectedNeutralCount = dice.filter((die) => die.face === selectedFace && die.isNeutral).length;
   const result = room.placeDice('host');
   assert.equal(result.count, selectedCount);
+  assert.equal(result.playerDiceCount, selectedPlayerCount);
+  assert.equal(result.neutralDiceCount, selectedNeutralCount);
+  assert.equal(room.lastPlacement.playerDiceCount, selectedPlayerCount);
+  assert.equal(room.lastPlacement.neutralDiceCount, selectedNeutralCount);
   assert.equal(room.casinos[selectedFace - 1].placedDice.length, selectedCount);
   assert.equal(room.getPlayer('host').remainingDice, 8 - selectedPlayerCount);
   assert.equal(room.getPlayer('host').remainingNeutralDice, 4 - selectedNeutralCount);
