@@ -83,6 +83,7 @@ io.on('connection', (socket) => {
       socket.join(code);
       socket.data.roomCode = code;
       socket.data.playerId = socket.id;
+      socket.data.isSpectator = false;
       const player = room.getPlayer(socket.id);
       reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id, reconnectToken: player.reconnectToken });
       publish(room);
@@ -100,6 +101,7 @@ io.on('connection', (socket) => {
       socket.join(normalizedCode);
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = player.id;
+      socket.data.isSpectator = false;
       reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id, reconnectToken: player.reconnectToken });
       publish(room);
     } catch (error) {
@@ -116,6 +118,7 @@ io.on('connection', (socket) => {
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = null;
       socket.data.isSpectator = true;
+      room.spectatorIds.add(socket.id);
       reply(callback, { ok: true, room: room.toJSON(null), isSpectator: true });
       publish(room);
     } catch (error) {
@@ -135,6 +138,7 @@ io.on('connection', (socket) => {
       socket.join(normalizedCode);
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = player.id;
+      socket.data.isSpectator = false;
       reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id });
       publish(room);
     } catch (error) {
@@ -250,6 +254,16 @@ io.on('connection', (socket) => {
     try {
       const room = findSocketRoom(socket);
       if (!room) throw new Error('참가 중인 방이 없습니다.');
+      if (socket.data.isSpectator) {
+        room.spectatorIds.delete(socket.id);
+        socket.leave(room.code);
+        socket.data.roomCode = null;
+        socket.data.playerId = null;
+        socket.data.isSpectator = false;
+        publish(room);
+        reply(callback, { ok: true });
+        return;
+      }
       const playerId = socketPlayerId(socket);
       const key = reconnectKey(room.code, playerId);
       clearTimeout(reconnectTimers.get(key));
@@ -307,6 +321,11 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const room = findSocketRoom(socket);
     if (!room) return;
+    if (socket.data.isSpectator) {
+      room.spectatorIds.delete(socket.id);
+      publish(room);
+      return;
+    }
     const playerId = socketPlayerId(socket);
     room.markDisconnected(playerId);
     publish(room);
@@ -357,7 +376,7 @@ app.get('/api/platform/rooms', (_request, response) => {
       hostNickname: room.getPlayer(room.hostId)?.nickname || '알 수 없음',
       playerCount: room.players.filter((player) => !player.abandoned).length,
       maxPlayers: room.maxPlayers,
-      spectatorCount: 0,
+      spectatorCount: room.spectatorIds.size,
       status: room.status === 'LOBBY' ? 'WAITING' : room.status === 'PLAYING' ? 'PLAYING' : 'FINISHED',
       requiresPassword: false,
       canJoin: room.status === 'LOBBY' && room.players.length < room.maxPlayers,

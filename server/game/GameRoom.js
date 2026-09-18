@@ -49,6 +49,7 @@ export class GameRoom {
     this.round = 0;
     this.turnPlayerIndex = 0;
     this.players = [];
+    this.spectatorIds = new Set();
     this.casinos = [];
     this.chatMessages = [];
     this.logs = [];
