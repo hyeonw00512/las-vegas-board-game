@@ -1,6 +1,6 @@
 const socket = io();
 const SESSION_KEY = 'lasVegasRoomSession';
-const state = { room: null, playerId: null, rolling: false, actionLocked: false, lastDiceSignature: '', lastPlacementActionId: '', lastTurnKey: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
+const state = { room: null, playerId: null, isSpectator: false, rolling: false, actionLocked: false, lastDiceSignature: '', lastPlacementActionId: '', lastTurnKey: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
 let audioContext;
 const SOUND_ASSETS = Object.freeze({
   roll: '/sounds/dice-roll.mp3',
@@ -490,7 +490,19 @@ async function joinRoom() {
   $('#room-code').value = code;
   return enter('joinRoom', { nickname: nickname(), code });
 }
+async function spectateRoom() {
+  const code = normalizeRoomCode($('#room-code').value);
+  if (code.length !== 5) return errorAt('#start-error', '방 코드 또는 올바른 초대 링크를 입력해주세요.');
+  const response = await emit('spectateRoom', { code });
+  if (!response?.ok) return errorAt('#start-error', response?.message || '관전할 수 없습니다.');
+  state.isSpectator = true;
+  state.playerId = null;
+  state.room = response.room;
+  sessionStorage.removeItem(SESSION_KEY);
+  showScreen(response.room.status === 'LOBBY' ? '#lobby-screen' : '#game-screen');
+}
 $('#join-button').addEventListener('click', joinRoom);
+$('#spectate-button').addEventListener('click', spectateRoom);
 $('#room-code').addEventListener('input', (event) => {
   const text = event.target.value.trim();
   if (!/^https?:\/\//i.test(text)) event.target.value = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);

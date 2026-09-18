@@ -34,7 +34,7 @@ function publish(room) {
   if (!socketIds) return;
   for (const socketId of socketIds) {
     const target = io.sockets.sockets.get(socketId);
-    if (target) target.emit('roomState', room.toJSON(socketPlayerId(target)));
+    if (target) target.emit('roomState', room.toJSON(target.data.isSpectator ? null : socketPlayerId(target)));
   }
 }
 
@@ -67,7 +67,7 @@ function findSocketRoom(socket) {
 }
 
 function socketPlayerId(socket) {
-  return socket.data.playerId || socket.id;
+  return socket.data.playerId ?? null;
 }
 
 function reconnectKey(roomCode, playerId) {
@@ -101,6 +101,22 @@ io.on('connection', (socket) => {
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = player.id;
       reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id, reconnectToken: player.reconnectToken });
+      publish(room);
+    } catch (error) {
+      reply(callback, { ok: false, message: error.message });
+    }
+  });
+
+  socket.on('spectateRoom', ({ code } = {}, callback) => {
+    try {
+      const normalizedCode = String(code || '').trim().toUpperCase();
+      const room = rooms.get(normalizedCode);
+      if (!room) throw new Error('방 코드를 확인해주세요.');
+      socket.join(normalizedCode);
+      socket.data.roomCode = normalizedCode;
+      socket.data.playerId = null;
+      socket.data.isSpectator = true;
+      reply(callback, { ok: true, room: room.toJSON(null), isSpectator: true });
       publish(room);
     } catch (error) {
       reply(callback, { ok: false, message: error.message });
