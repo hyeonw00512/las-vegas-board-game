@@ -345,6 +345,28 @@ setInterval(() => {
 app.use(express.static(clientPath));
 app.use('/vendor/phaser', express.static(path.resolve(clientPath, '../node_modules/phaser/dist')));
 app.get('/health', (_request, response) => response.json({ ok: true }));
+app.get('/api/platform/rooms', (_request, response) => {
+  const baseUrl = process.env.PUBLIC_APP_URL || 'https://las-vegas-board-game.onrender.com';
+  response.json({
+    version: 1,
+    gameId: 'neon-dice',
+    updatedAt: new Date().toISOString(),
+    capabilities: { canSpectate: true, canReserveNextRound: false },
+    rooms: [...rooms.values()].map((room) => ({
+      roomCode: room.code,
+      hostNickname: room.getPlayer(room.hostId)?.nickname || '알 수 없음',
+      playerCount: room.players.filter((player) => !player.abandoned).length,
+      maxPlayers: room.maxPlayers,
+      spectatorCount: 0,
+      status: room.status === 'LOBBY' ? 'WAITING' : room.status === 'PLAYING' ? 'PLAYING' : 'FINISHED',
+      requiresPassword: false,
+      canJoin: room.status === 'LOBBY' && room.players.length < room.maxPlayers,
+      canSpectate: true,
+      canReserveNextRound: false,
+      joinUrl: `${baseUrl}/?room=${room.code}`
+    }))
+  });
+});
 app.use((_request, response) => response.sendFile(path.join(clientPath, 'index.html')));
 
 const portArgumentIndex = process.argv.indexOf('--port');
