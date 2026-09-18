@@ -112,8 +112,7 @@ export class GameRoom {
     }
     if (this.status !== 'PLAYING' || this.roundPlacementComplete) return;
     if (this.players.every((item) => this.totalRemainingDice(item) === 0)) {
-      this.roundPlacementComplete = true;
-      this.settleRound();
+      this.completeRoundPlacement();
     } else if (this.currentTurnPlayer()?.id === playerId) {
       this.advanceTurn();
     }
@@ -150,8 +149,11 @@ export class GameRoom {
     this.status = 'PLAYING';
     this.turnPlayerIndex = this.startPlayerIndex;
     this.roundPlacementComplete = false;
+    this.settlementPending = false;
+    this.settlementReadyAt = null;
     this.roundResults = [];
     this.lastAction = null;
+    this.lastPlacement = null;
     this.casinos = Array.from({ length: 6 }, (_, index) => ({
       number: index + 1,
       rewards: dealRewards(this.rewardDeck),
@@ -228,19 +230,33 @@ export class GameRoom {
     this.removePlayer(playerId);
   }
 
+  forfeitPlayer(playerId) {
+    if (this.status !== 'PLAYING') throw new Error('진행 중인 게임에서만 포기할 수 있습니다.');
+    const player = this.getPlayer(playerId);
+    if (!player || player.abandoned) throw new Error('포기할 플레이어를 찾을 수 없습니다.');
+    player.connected = false;
+    for (const casino of this.casinos) {
+      casino.placedDice = casino.placedDice.filter((die) => die.playerId !== playerId);
+    }
+    this.addLog(`${player.nickname}님이 게임을 포기했습니다.`, 'forfeit');
+    this.abandonPlayer(playerId);
+  }
+
   assignOpeningNeutral() {
     if (!this.openingNeutralPending) throw new Error('사전 배치할 중립 주사위가 없습니다.');
     const dice = Array.from({ length: 2 }, () => randomInt(1, 7));
     for (const face of dice) {
-      this.casinos[face - 1].placedDice.push(this.makePlacedDie(null, true));
+      this.casinos[face - 1].placedDice.push(this.makePlacedDie(null, true, face));
     }
     this.openingNeutralPending = false;
     this.lastAction = {
+      id: randomUUID(),
       playerId: NEUTRAL_ID,
       nickname: '시스템',
       openingNeutral: true,
       faces: dice
     };
+    this.lastPlacement = this.lastAction;
     this.addLog(`시스템이 남는 흰색 주사위 ${dice.join('·')}을 자동 배치했습니다.`, 'neutral');
     this.resetTurnDeadline();
     return dice;
@@ -280,26 +296,32 @@ export class GameRoom {
     const face = player.selectedFace;
     const selectedDice = player.dice.filter((die) => die.face === face);
     const count = selectedDice.length;
+    const playerDiceCount = selectedDice.filter((die) => !die.isNeutral).length;
+    const neutralDiceCount = selectedDice.filter((die) => die.isNeutral).length;
     if (!count) throw new Error('선택한 주사위가 없습니다.');
     const casino = this.casinos.find((item) => item.number === face);
     if (!casino) throw new Error('배치할 장소를 찾을 수 없습니다.');
 
-    casino.placedDice.push(...selectedDice.map((die) => this.makePlacedDie(player, die.isNeutral)));
-    player.remainingDice -= selectedDice.filter((die) => !die.isNeutral).length;
-    player.remainingNeutralDice -= selectedDice.filter((die) => die.isNeutral).length;
+    casino.placedDice.push(...selectedDice.map((die) => this.makePlacedDie(player, die.isNeutral, die.face)));
+    player.remainingDice -= playerDiceCount;
+    player.remainingNeutralDice -= neutralDiceCount;
     player.dice = [];
     player.selectedFace = null;
     this.lastAction = {
+      id: randomUUID(),
       playerId: player.id,
       nickname: player.nickname,
       face,
-      count
+      count,
+      playerDiceCount,
+      neutralDiceCount
     };
-    this.addLog(`${player.nickname} → ${face}번 카지노에 주사위 ${count}개 배치`, 'place');
+    this.lastPlacement = this.lastAction;
+    const diceDetail = [playerDiceCount && `색 주사위 ${playerDiceCount}개`, neutralDiceCount && `흰색 주사위 ${neutralDiceCount}개`].filter(Boolean).join(' · ');
+    this.addLog(`${player.nickname} → ${face}번 카지노에 ${diceDetail} 배치`, 'place');
 
     if (this.players.every((item) => this.totalRemainingDice(item) === 0)) {
-      this.roundPlacementComplete = true;
-      this.settleRound();
+      this.completeRoundPlacement();
     } else {
       this.advanceTurn();
     }
@@ -307,6 +329,8 @@ export class GameRoom {
     return {
       face,
       count,
+      playerDiceCount,
+      neutralDiceCount,
       roundPlacementComplete: this.roundPlacementComplete,
       nextTurnPlayerId: this.roundPlacementComplete ? null : this.currentTurnPlayer()?.id
     };
@@ -321,6 +345,13 @@ export class GameRoom {
         return;
       }
     }
+  }
+
+  completeRoundPlacement() {
+    this.roundPlacementComplete = true;
+    this.settlementPending = true;
+    this.settlementReadyAt = Date.now() + 3500;
+    this.turnDeadline = null;
   }
 
   currentTurnPlayer() {
@@ -353,10 +384,10 @@ export class GameRoom {
     return player.remainingDice + player.remainingNeutralDice;
   }
 
-  makePlacedDie(player, isNeutral) {
+  makePlacedDie(player, isNeutral, face) {
     return isNeutral
-      ? { playerId: NEUTRAL_ID, nickname: '중립', color: NEUTRAL_COLOR, isNeutral: true }
-      : { playerId: player.id, nickname: player.nickname, color: player.color, isNeutral: false };
+      ? { playerId: NEUTRAL_ID, nickname: '중립', color: NEUTRAL_COLOR, isNeutral: true, face }
+      : { playerId: player.id, nickname: player.nickname, color: player.color, isNeutral: false, face };
   }
 
   settleRound() {
@@ -404,6 +435,8 @@ export class GameRoom {
     });
 
     this.turnDeadline = null;
+    this.settlementPending = false;
+    this.settlementReadyAt = null;
     this.status = this.round >= this.settings.rounds ? 'GAME_OVER' : 'ROUND_RESULT';
     this.lastAction = { roundSettled: true, round: this.round };
     this.addLog(`${this.round}라운드 정산이 완료되었습니다.`, 'settle');
@@ -411,7 +444,7 @@ export class GameRoom {
   }
 
   finalRanking() {
-    return [...this.players]
+    return this.players.filter((player) => !player.abandoned)
       .sort((a, b) => b.money - a.money)
       .map((player, index) => ({
         rank: index + 1,
@@ -449,7 +482,7 @@ export class GameRoom {
     this.logs = this.logs.slice(-80);
   }
 
-  toJSON() {
+  toJSON(viewerId) {
     return {
       code: this.code,
       hostId: this.hostId,
@@ -459,15 +492,21 @@ export class GameRoom {
       round: this.round,
       turnPlayerIndex: this.turnPlayerIndex,
       roundPlacementComplete: this.roundPlacementComplete,
+      settlementPending: this.settlementPending,
+      settlementReadyAt: this.settlementReadyAt,
       roundResults: this.roundResults,
       lastAction: this.lastAction,
+      lastPlacement: this.lastPlacement,
       openingNeutralPending: this.openingNeutralPending,
       rewardDeckCount: this.rewardDeck?.length ?? 0,
       turnDeadline: this.turnDeadline,
       finalRanking: this.status === 'GAME_OVER' ? this.finalRanking() : [],
       chatMessages: this.chatMessages,
       logs: this.logs,
-      players: this.players,
+      players: this.players.map((player) => ({
+        ...player,
+        dice: player.id === viewerId ? player.dice : []
+      })),
       casinos: this.casinos
     };
   }

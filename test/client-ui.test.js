@@ -43,7 +43,7 @@ test('모바일 안전 영역과 키보드 접근성을 제공한다', () => {
   assert.match(styles, /100dvh/);
   assert.match(styles, /safe-area-inset-bottom/);
   assert.match(styles, /prefers-reduced-motion:reduce/);
-  assert.match(styles, /\.die \{ width:44px; height:44px;/);
+  assert.match(styles, /\.die \{ width:54px; height:54px;/);
 });
 
 test('내 차례 강조와 모바일 가로 화면 안내를 제공한다', () => {
@@ -71,4 +71,74 @@ test('3인전 남는 주사위는 시스템 배정 상태를 표시한다', () =
   assert.match(script, /남는 주사위 배정 중…/);
   assert.doesNotMatch(script, /emit\(state\.room\?\.openingNeutralPending \? 'rollOpeningNeutral'/);
   assert.match(html, /시스템이 자동으로 굴려/);
+});
+
+test('배치와 내 차례에 맞춘 효과음과 칩 배치 효과를 제공한다', () => {
+  assert.match(script, /playSound\('turn'\)/);
+  assert.match(script, /playSound\('neutral'\)/);
+  assert.match(script, /const SOUND_ASSETS = Object\.freeze/);
+  assert.match(script, /your-turn\.mp3/);
+  assert.match(script, /function playSoundAsset\(type\)/);
+  assert.match(script, /function playFallbackTone\(type\)/);
+  assert.match(script, /just-placed/);
+  assert.match(styles, /@keyframes chip-drop/);
+  assert.match(styles, /\.casino-card\.just-placed/);
+});
+
+test('마지막 배치 확인과 라운드 수익 요약을 제공한다', () => {
+  for (const id of ['placement-flash', 'round-summary', 'settlement-board']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(script, /function renderPlacementFlash\(room\)/);
+  assert.match(script, /function renderRoundSummary\(room\)/);
+  assert.match(script, /function renderSettlementBoard\(room\)/);
+  assert.match(script, /room\.lastPlacement \?\? room\.lastAction/);
+  assert.match(styles, /\.casino-card\.last-placement/);
+  assert.match(styles, /\.round-earnings/);
+});
+
+test('진행 중 게임 포기와 제외 처리를 제공한다', () => {
+  assert.match(html, /id="forfeit-button"/);
+  assert.match(script, /function forfeitGame\(\)/);
+  assert.match(script, /emit\('forfeitGame'\)/);
+  assert.match(script, /filter\(\(player\) => !player\.abandoned\)/);
+  assert.match(styles, /\.topbar-forfeit/);
+  assert.match(styles, /\.room-actions \.topbar-rule \{ display:none; \}/);
+});
+
+test('큰 주사위와 선택 안내로 주사위 조작을 명확하게 한다', () => {
+  assert.match(html, /id="selection-summary"/);
+  assert.match(script, /눈 주사위 \$\{selectedCount\}개 선택됨/);
+  assert.match(styles, /\.die \{ flex:0 0 auto; width:60px; height:60px;/);
+  assert.match(styles, /\.face i \{ width:11px; height:11px;/);
+  assert.match(styles, /\.die\.selected \{ border-color:var\(--yellow\); transform:translateY\(-7px\) scale\(1\.06\)/);
+});
+
+test('카지노 판 위 배치 주사위도 눈금과 색상으로 구분한다', () => {
+  assert.match(script, /class="board-die/);
+  assert.match(script, /pipMarkup\(group\.face \?\? casino\.number\)/);
+  assert.match(styles, /\.board-die \{[^}]*width:34px; height:34px;/);
+  assert.match(styles, /\.board-die \.face i \{ width:6px; height:6px;/);
+});
+
+test('많은 플레이어가 같은 카지노에 배팅해도 모든 표시를 확장한다', () => {
+  assert.match(script, /const bettorCount = new Set\(casino\.placedDice\.map/);
+  assert.match(script, /bettors-\$\{bettorCount\}/);
+  assert.match(styles, /\.casino-card\.crowded-bets/);
+  assert.match(styles, /\.bet-zone\.bettors-4,\.bet-zone\.bettors-5/);
+});
+
+test('카지노 배팅 표시는 같은 눈을 많이 건 플레이어부터 정렬한다', () => {
+  assert.match(script, /groups\.values\(\)\]\.sort\(\(left, right\) => right\.count - left\.count\)/);
+});
+
+test('마지막 배치에서 색 주사위와 흰색 주사위 수를 구분해 안내한다', () => {
+  assert.match(script, /function placedDiceDescription\(action\)/);
+  assert.match(script, /색 주사위 \$\{action\.playerDiceCount\}개/);
+  assert.match(script, /흰색 주사위 \$\{action\.neutralDiceCount\}개/);
+});
+
+test('마지막 배치 배지는 배팅 주사위 영역을 가리지 않는다', () => {
+  assert.match(styles, /\.last-placement-marker \{ position:absolute; top:\.55rem; left:\.55rem;/);
+  assert.doesNotMatch(styles, /\.last-placement-marker \{ position:absolute; top:50%; left:50%;/);
 });

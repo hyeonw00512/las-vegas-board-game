@@ -46,6 +46,10 @@ test('주사위 굴림과 숫자 묶음 선택은 서버가 검증한다', () =>
   const selectedNeutralCount = dice.filter((die) => die.face === selectedFace && die.isNeutral).length;
   const result = room.placeDice('host');
   assert.equal(result.count, selectedCount);
+  assert.equal(result.playerDiceCount, selectedPlayerCount);
+  assert.equal(result.neutralDiceCount, selectedNeutralCount);
+  assert.equal(room.lastPlacement.playerDiceCount, selectedPlayerCount);
+  assert.equal(room.lastPlacement.neutralDiceCount, selectedNeutralCount);
   assert.equal(room.casinos[selectedFace - 1].placedDice.length, selectedCount);
   assert.equal(room.getPlayer('host').remainingDice, 8 - selectedPlayerCount);
   assert.equal(room.getPlayer('host').remainingNeutralDice, 4 - selectedNeutralCount);
@@ -74,6 +78,25 @@ test('주사위를 모두 쓴 플레이어는 건너뛰고 전원이 소진하�
   const result = room.placeDice('guest');
   assert.equal(result.roundPlacementComplete, true);
   assert.equal(room.roundPlacementComplete, true);
+  assert.equal(room.settlementPending, true);
+  assert.equal(room.status, 'PLAYING');
+  assert.equal(room.lastPlacement.face, 5);
+});
+
+test('라운드 정산 뒤에도 마지막 배치와 이번 라운드 수익 근거를 보존한다', () => {
+  const room = new GameRoom('RECAP', socket('a'), 'A', 2);
+  room.addPlayer(socket('b'), 'B');
+  room.toggleReady('a'); room.toggleReady('b'); room.start('a');
+  room.casinos.forEach((casino) => { casino.rewards = []; casino.placedDice = []; });
+  room.casinos[3].rewards = [60];
+  room.casinos[3].placedDice = Array.from({ length: 2 }, () => room.makePlacedDie(room.getPlayer('a'), false));
+  room.lastPlacement = { id: 'last-bet', playerId: 'a', nickname: 'A', face: 4, count: 2 };
+  room.roundPlacementComplete = true;
+  room.settlementPending = true;
+  room.settleRound();
+  assert.equal(room.lastPlacement.face, 4);
+  assert.equal(room.roundResults[3].awards[0].reward, 60);
+  assert.equal(room.getPlayer('a').money, 60);
 });
 
 test('2인과 4인은 흰색 주사위 규칙에 맞게 나눠 갖는다', () => {
@@ -104,6 +127,19 @@ test('3인은 시스템이 남은 흰색 주사위 2개를 자동 배치한다',
   assert.equal(room.openingNeutralPending, false);
   assert.equal(room.currentTurnPlayer().id, 'a');
   assert.match(room.logs.at(-1).message, /시스템/);
+});
+
+test('배치된 주사위는 판 위 눈금 표시를 위해 나온 숫자를 보존한다', () => {
+  const room = new GameRoom('FACE4', socket('a'), 'A', 2);
+  room.addPlayer(socket('b'), 'B');
+  room.toggleReady('a'); room.toggleReady('b'); room.start('a');
+  const player = room.currentTurnPlayer();
+  player.dice = [{ face: 4, isNeutral: false }];
+  player.selectedFace = 4;
+
+  room.placeDice(player.id);
+
+  assert.equal(room.casinos[3].placedDice[0].face, 4);
 });
 
 test('지폐 54장을 섞고 카지노 1부터 6까지 순서대로 배분한다', () => {
@@ -194,6 +230,17 @@ test('재접속 토큰으로 기존 플레이어 상태를 복구하고 토큰�
   assert.doesNotMatch(JSON.stringify(room.toJSON()), new RegExp(token));
 });
 
+test('참가자별 상태에는 자기 주사위만 포함된다', () => {
+  const room = new GameRoom('SECRET', socket('a'), 'A', 2);
+  room.addPlayer(socket('b'), 'B');
+  room.toggleReady('a'); room.toggleReady('b'); room.start('a');
+  const dice = room.roll('a');
+  const hostView = room.toJSON('a');
+  const guestView = room.toJSON('b');
+  assert.deepEqual(hostView.players.find((player) => player.id === 'a').dice, dice);
+  assert.deepEqual(guestView.players.find((player) => player.id === 'a').dice, []);
+});
+
 test('채팅 메시지는 공백을 정리하고 최근 50개만 보관한다', () => {
   const room = new GameRoom('CHATT', socket('a'), 'A', 2);
   const first = room.sendChat('a', '  안녕   반가워  ');
@@ -235,6 +282,27 @@ test('진행 중 방장이 나가면 다음 연결 참가자에게 방장을 넘
   assert.equal(room.getPlayer('a').abandoned, true);
   assert.equal(room.hostId, 'b');
   assert.equal(room.currentTurnPlayer().id, 'b');
+});
+
+test('게임 포기자는 경쟁과 최종 순위에서 즉시 제외된다', () => {
+  const room = new GameRoom('QUITR', socket('a'), 'A', 2);
+  room.addPlayer(socket('b'), 'B');
+  room.toggleReady('a'); room.toggleReady('b'); room.start('a');
+  room.getPlayer('a').money = 90;
+  room.casinos[0].placedDice = [
+    room.makePlacedDie(room.getPlayer('a'), false),
+    room.makePlacedDie(room.getPlayer('b'), false),
+    room.makePlacedDie(null, true)
+  ];
+  room.forfeitPlayer('a');
+  assert.equal(room.getPlayer('a').abandoned, true);
+  assert.equal(room.getPlayer('a').remainingDice, 0);
+  assert.equal(room.hostId, 'b');
+  assert.equal(room.casinos[0].placedDice.some((die) => die.playerId === 'a'), false);
+  assert.equal(room.casinos[0].placedDice.filter((die) => die.isNeutral).length, 1);
+  room.status = 'GAME_OVER';
+  assert.deepEqual(room.finalRanking().map((player) => player.playerId), ['b']);
+  assert.match(room.logs.at(-1).message, /게임을 포기/);
 });
 
 test('방 설정값을 허용 범위로 정리해 게임에 적용한다', () => {
