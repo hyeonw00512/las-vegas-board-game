@@ -493,7 +493,7 @@ async function joinRoom() {
 async function spectateRoom() {
   const code = normalizeRoomCode($('#room-code').value);
   if (code.length !== 5) return errorAt('#start-error', '방 코드 또는 올바른 초대 링크를 입력해주세요.');
-  const response = await emit('spectateRoom', { code });
+  const response = await emit('spectateRoom', { code, nickname: nickname() });
   if (!response?.ok) return errorAt('#start-error', response?.message || '관전할 수 없습니다.');
   state.isSpectator = true;
   state.playerId = null;

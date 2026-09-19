@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('spectateRoom', ({ code } = {}, callback) => {
+  socket.on('spectateRoom', ({ code, nickname } = {}, callback) => {
     try {
       const normalizedCode = String(code || '').trim().toUpperCase();
       const room = rooms.get(normalizedCode);
@@ -118,6 +118,7 @@ io.on('connection', (socket) => {
       socket.data.roomCode = normalizedCode;
       socket.data.playerId = null;
       socket.data.isSpectator = true;
+      socket.data.spectatorNickname = String(nickname || '').trim().slice(0, 12) || '관전자';
       room.spectatorIds.add(socket.id);
       reply(callback, { ok: true, room: room.toJSON(null), isSpectator: true });
       publish(room);
@@ -310,7 +311,9 @@ io.on('connection', (socket) => {
     try {
       const room = findSocketRoom(socket);
       if (!room) throw new Error('참가 중인 방이 없습니다.');
-      const chatMessage = room.sendChat(socketPlayerId(socket), message);
+      const chatMessage = socket.data.isSpectator
+        ? room.sendSpectatorChat(socket.id, socket.data.spectatorNickname, message)
+        : room.sendChat(socketPlayerId(socket), message);
       io.to(room.code).emit('chatMessage', chatMessage);
       reply(callback, { ok: true });
     } catch (error) {

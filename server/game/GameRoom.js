@@ -478,6 +478,23 @@ export class GameRoom {
     return chatMessage;
   }
 
+  sendSpectatorChat(spectatorId, nickname, message) {
+    const cleanName = String(nickname || '').trim().slice(0, 12) || '관전자';
+    const cleanMessage = String(message || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!cleanMessage) throw new Error('메시지를 입력해주세요.');
+    const chatMessage = {
+      id: randomUUID(),
+      playerId: spectatorId,
+      nickname: `${cleanName} (관전)`,
+      color: '#9aa5b1',
+      message: cleanMessage,
+      timestamp: Date.now()
+    };
+    this.chatMessages.push(chatMessage);
+    this.chatMessages = this.chatMessages.slice(-50);
+    return chatMessage;
+  }
+
   addLog(message, type = 'system') {
     this.logs.push({ id: randomUUID(), type, message, timestamp: Date.now() });
     this.logs = this.logs.slice(-80);
