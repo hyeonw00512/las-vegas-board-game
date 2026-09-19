@@ -1,5 +1,6 @@
 const socket = io();
 const SESSION_KEY = 'lasVegasRoomSession';
+const SPECTATOR_SESSION_KEY = 'lasVegasSpectatorSession';
 const state = { room: null, playerId: null, isSpectator: false, rolling: false, actionLocked: false, lastDiceSignature: '', lastPlacementActionId: '', lastTurnKey: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
 let audioContext;
 const SOUND_ASSETS = Object.freeze({
@@ -499,6 +500,7 @@ async function spectateRoom() {
   state.playerId = null;
   state.room = response.room;
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.setItem(SPECTATOR_SESSION_KEY, JSON.stringify({ code, spectatorToken: response.spectatorToken }));
   showScreen(response.room.status === 'LOBBY' ? '#lobby-screen' : '#game-screen');
 }
 $('#join-button').addEventListener('click', joinRoom);
@@ -587,12 +589,13 @@ socket.on('roomState', (room) => {
 
 socket.on('connect', async () => {
   const stored = sessionStorage.getItem(SESSION_KEY);
-  if (!stored) return;
+  const spectatorStored = sessionStorage.getItem(SPECTATOR_SESSION_KEY);
+  if (!stored && !spectatorStored) return;
   try {
-    const session = JSON.parse(stored);
-    const response = await emit('restoreSession', session);
+    const session = JSON.parse(stored || spectatorStored);
+    const response = await emit(stored ? 'restoreSession' : 'restoreSpectator', session);
     if (!response?.ok) {
-      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(stored ? SESSION_KEY : SPECTATOR_SESSION_KEY);
       state.room = null;
       state.playerId = null;
       showScreen('#start-screen');
@@ -600,12 +603,13 @@ socket.on('connect', async () => {
       return;
     }
     state.room = response.room;
-    state.playerId = response.playerId;
+    state.playerId = response.playerId ?? null;
+    state.isSpectator = Boolean(response.isSpectator);
     showScreen(response.room.status === 'LOBBY' ? '#lobby-screen' : '#game-screen');
     response.room.status === 'LOBBY' ? renderLobby() : renderGame();
-    toast('기존 플레이어로 다시 연결했습니다.');
+    toast(response.isSpectator ? '관전 중인 방으로 다시 연결했습니다.' : '기존 플레이어로 다시 연결했습니다.');
   } catch {
-    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(stored ? SESSION_KEY : SPECTATOR_SESSION_KEY);
   }
 });
 
@@ -678,6 +682,7 @@ async function leaveRoom() {
   const response = await emit('leaveRoom');
   if (!response?.ok) return toast(response?.message || '방을 나가지 못했습니다.');
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SPECTATOR_SESSION_KEY);
   state.room = null;
   state.playerId = null;
   state.lastDiceSignature = '';

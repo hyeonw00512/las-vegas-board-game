@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import express from 'express';
@@ -109,7 +109,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('spectateRoom', ({ code, nickname } = {}, callback) => {
+  socket.on('spectateRoom', ({ code, nickname, spectatorToken } = {}, callback) => {
     try {
       const normalizedCode = String(code || '').trim().toUpperCase();
       const room = rooms.get(normalizedCode);
@@ -119,7 +119,27 @@ io.on('connection', (socket) => {
       socket.data.playerId = null;
       socket.data.isSpectator = true;
       socket.data.spectatorNickname = String(nickname || '').trim().slice(0, 12) || '관전자';
-      room.spectatorIds.add(socket.id);
+      socket.data.spectatorToken = String(spectatorToken || '').trim() || randomUUID();
+      room.spectators.set(socket.data.spectatorToken, { nickname: socket.data.spectatorNickname, socketId: socket.id });
+      reply(callback, { ok: true, room: room.toJSON(null), isSpectator: true, spectatorToken: socket.data.spectatorToken });
+      publish(room);
+    } catch (error) {
+      reply(callback, { ok: false, message: error.message });
+    }
+  });
+
+  socket.on('restoreSpectator', ({ code, spectatorToken } = {}, callback) => {
+    try {
+      const room = rooms.get(String(code || '').trim().toUpperCase());
+      const spectator = room?.spectators.get(String(spectatorToken || '').trim());
+      if (!room || !spectator) throw new Error('관전 세션을 복구하지 못했습니다.');
+      socket.join(room.code);
+      socket.data.roomCode = room.code;
+      socket.data.playerId = null;
+      socket.data.isSpectator = true;
+      socket.data.spectatorToken = String(spectatorToken).trim();
+      socket.data.spectatorNickname = spectator.nickname;
+      spectator.socketId = socket.id;
       reply(callback, { ok: true, room: room.toJSON(null), isSpectator: true });
       publish(room);
     } catch (error) {
@@ -256,7 +276,7 @@ io.on('connection', (socket) => {
       const room = findSocketRoom(socket);
       if (!room) throw new Error('참가 중인 방이 없습니다.');
       if (socket.data.isSpectator) {
-        room.spectatorIds.delete(socket.id);
+        room.spectators.delete(socket.data.spectatorToken);
         socket.leave(room.code);
         socket.data.roomCode = null;
         socket.data.playerId = null;
@@ -325,7 +345,8 @@ io.on('connection', (socket) => {
     const room = findSocketRoom(socket);
     if (!room) return;
     if (socket.data.isSpectator) {
-      room.spectatorIds.delete(socket.id);
+      const spectator = room.spectators.get(socket.data.spectatorToken);
+      if (spectator?.socketId === socket.id) spectator.socketId = null;
       publish(room);
       return;
     }
@@ -379,7 +400,7 @@ app.get('/api/platform/rooms', (_request, response) => {
       hostNickname: room.getPlayer(room.hostId)?.nickname || '알 수 없음',
       playerCount: room.players.filter((player) => !player.abandoned).length,
       maxPlayers: room.maxPlayers,
-      spectatorCount: room.spectatorIds.size,
+      spectatorCount: [...room.spectators.values()].filter((spectator) => spectator.socketId).length,
       status: room.status === 'LOBBY' ? 'WAITING' : room.status === 'PLAYING' ? 'PLAYING' : 'FINISHED',
       visibility: 'PUBLIC',
       requiresPassword: false,
