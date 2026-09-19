@@ -378,6 +378,7 @@ app.get('/api/platform/rooms', (_request, response) => {
       maxPlayers: room.maxPlayers,
       spectatorCount: room.spectatorIds.size,
       status: room.status === 'LOBBY' ? 'WAITING' : room.status === 'PLAYING' ? 'PLAYING' : 'FINISHED',
+      visibility: 'PUBLIC',
       requiresPassword: false,
       canJoin: room.status === 'LOBBY' && room.players.length < room.maxPlayers,
       canSpectate: true,
