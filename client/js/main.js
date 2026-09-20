@@ -491,6 +491,17 @@ async function joinRoom() {
   $('#room-code').value = code;
   return enter('joinRoom', { nickname: nickname(), code });
 }
+
+async function applyPlatformJoinFromLocation() {
+  const joinToken = new URLSearchParams(window.location.search).get('joinToken');
+  if (!joinToken || sessionStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SPECTATOR_SESSION_KEY)) return;
+  const response = await emit('platformJoin', { joinToken });
+  if (!response?.ok) return errorAt('#start-error', response?.message || '자동 입장에 실패했습니다.');
+  state.room = response.room; state.playerId = response.playerId ?? null; state.isSpectator = Boolean(response.isSpectator);
+  if (response.isSpectator) sessionStorage.setItem(SPECTATOR_SESSION_KEY, JSON.stringify({ code: response.room.code, spectatorToken: response.spectatorToken }));
+  else sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code: response.room.code, reconnectToken: response.reconnectToken }));
+  showScreen(response.room.status === 'LOBBY' ? '#lobby-screen' : '#game-screen');
+}
 async function spectateRoom() {
   const code = normalizeRoomCode($('#room-code').value);
   if (code.length !== 5) return errorAt('#start-error', '방 코드 또는 올바른 초대 링크를 입력해주세요.');
@@ -614,6 +625,7 @@ socket.on('connect', async () => {
 });
 
 applyInviteFromLocation();
+applyPlatformJoinFromLocation();
 
 socket.on('dicePlaced', ({ roundPlacementComplete }) => {
   playSound('place');

@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt, randomUUID, createHmac, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import express from 'express';
@@ -70,11 +70,37 @@ function socketPlayerId(socket) {
   return socket.data.playerId ?? null;
 }
 
+function verifyPlatformJoinToken(token) {
+  const [body, signature] = String(token || '').split('.');
+  const secret = process.env.PLATFORM_JOIN_SECRET;
+  if (!body || !signature || !secret) throw new Error('플랫폼 자동 입장을 사용할 수 없습니다.');
+  const expected = createHmac('sha256', secret).update(body).digest('base64url');
+  if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) throw new Error('입장 토큰이 올바르지 않습니다.');
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  if (payload.gameId !== 'neon-dice' || payload.exp < Date.now()) throw new Error('입장 토큰이 만료되었습니다.');
+  return payload;
+}
+
 function reconnectKey(roomCode, playerId) {
   return `${roomCode}:${playerId}`;
 }
 
 io.on('connection', (socket) => {
+  socket.on('platformJoin', ({ joinToken } = {}, callback) => {
+    try {
+      const payload = verifyPlatformJoinToken(joinToken);
+      const room = rooms.get(payload.roomCode);
+      if (!room) throw new Error('방 코드를 확인해주세요.');
+      if (payload.mode === 'SPECTATOR') {
+        socket.join(room.code); socket.data.roomCode = room.code; socket.data.playerId = null; socket.data.isSpectator = true;
+        socket.data.spectatorNickname = payload.nickname; socket.data.spectatorToken = randomUUID(); room.spectators.set(socket.data.spectatorToken, { nickname: payload.nickname, socketId: socket.id });
+        reply(callback, { ok: true, room: room.toJSON(null), isSpectator: true, spectatorToken: socket.data.spectatorToken }); publish(room); return;
+      }
+      const player = room.addPlayer(socket, payload.nickname);
+      socket.join(room.code); socket.data.roomCode = room.code; socket.data.playerId = player.id; socket.data.isSpectator = false;
+      reply(callback, { ok: true, room: room.toJSON(player.id), playerId: player.id, reconnectToken: player.reconnectToken }); publish(room);
+    } catch (error) { reply(callback, { ok: false, message: error.message }); }
+  });
   socket.on('createRoom', ({ nickname, maxPlayers, diceCount, rounds, turnSeconds } = {}, callback) => {
     try {
       const code = makeCode();
