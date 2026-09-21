@@ -718,6 +718,10 @@ async function forfeitGame() {
 $('#lobby-leave-button').addEventListener('click', leaveRoom);
 $('#leave-room-button').addEventListener('click', leaveRoom);
 $('#forfeit-button').addEventListener('click', forfeitGame);
+document.querySelectorAll('[data-platform-return]').forEach(button => button.addEventListener('click', () => {
+  const platformUrl = new URLSearchParams(location.search).get('platformUrl') || document.referrer || '/';
+  window.location.assign(platformUrl);
+}));
 $('#restart-game-button').addEventListener('click', async () => {
   const response = await emit('restartGame');
   if (!response?.ok) toast(response?.message || '게임을 다시 시작하지 못했습니다.');
