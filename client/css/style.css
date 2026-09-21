@@ -4,6 +4,7 @@
 * { box-sizing:border-box; }
 html { min-height:100%; overflow-x:hidden; }
 html, body { margin:0; background:#06100f; color:var(--ink); font-family:Inter,'Noto Sans KR',sans-serif; }
+body { min-height:100dvh; background:linear-gradient(rgba(4,4,16,.52),rgba(4,4,16,.78)),url('../assets/casino-neon-background.png') center/cover fixed; }
 body { min-height:100vh; min-height:100dvh; overflow-x:hidden; background:radial-gradient(circle at 62% 18%,rgba(37,125,91,.24),transparent 28%),linear-gradient(135deg,#050d0c,#0a1916 55%,#050d0c); }
 #phaser-ambient { position:fixed; inset:0; z-index:0; pointer-events:none; }
 #app { position:relative; z-index:1; }
