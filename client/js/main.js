@@ -6,8 +6,8 @@ const platformNickname = new URLSearchParams(location.search).get('platformNickn
 const platformActivityToken = new URLSearchParams(location.search).get('platformActivityToken');
 const platformHomeUrl = () => new URLSearchParams(location.search).get('platformUrl') || document.referrer || '/';
 let lastPlatformActivity = '';
-function reportPlatformActivity(status) {
-  if (!platformActivityToken || lastPlatformActivity === status) return;
+function reportPlatformActivity(status, force = false) {
+  if (!platformActivityToken || (!force && lastPlatformActivity === status)) return;
   lastPlatformActivity = status;
   let endpoint;
   try { endpoint = new URL('/api/activity', platformHomeUrl()).toString(); } catch { return; }
@@ -646,6 +646,7 @@ socket.on('connect', async () => {
 applyInviteFromLocation();
 applyPlatformJoinFromLocation();
 reportPlatformActivity('LOBBY');
+window.setInterval(() => reportPlatformActivity(!state.room ? 'LOBBY' : state.isSpectator ? 'SPECTATING' : state.room.status === 'LOBBY' ? 'LOBBY' : 'PLAYING', true), 45_000);
 
 socket.on('dicePlaced', ({ roundPlacementComplete }) => {
   playSound('place');
