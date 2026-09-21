@@ -3,6 +3,16 @@ const SESSION_KEY = 'lasVegasRoomSession';
 const SPECTATOR_SESSION_KEY = 'lasVegasSpectatorSession';
 const state = { room: null, playerId: null, isSpectator: false, rolling: false, actionLocked: false, lastDiceSignature: '', lastPlacementActionId: '', lastTurnKey: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
 const platformNickname = new URLSearchParams(location.search).get('platformNickname')?.trim() || '';
+const platformActivityToken = new URLSearchParams(location.search).get('platformActivityToken');
+const platformHomeUrl = () => new URLSearchParams(location.search).get('platformUrl') || document.referrer || '/';
+let lastPlatformActivity = '';
+function reportPlatformActivity(status) {
+  if (!platformActivityToken || lastPlatformActivity === status) return;
+  lastPlatformActivity = status;
+  let endpoint;
+  try { endpoint = new URL('/api/activity', platformHomeUrl()).toString(); } catch { return; }
+  fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: platformActivityToken, status }), keepalive: true }).catch(() => { lastPlatformActivity = ''; });
+}
 let audioContext;
 const SOUND_ASSETS = Object.freeze({
   roll: '/sounds/dice-roll.mp3',
@@ -590,6 +600,7 @@ socket.on('roomState', (room) => {
   const previousStatus = state.room?.status;
   const previousTurnKey = state.lastTurnKey;
   state.room = room;
+  reportPlatformActivity(state.isSpectator ? 'SPECTATING' : room.status === 'LOBBY' ? 'LOBBY' : 'PLAYING');
   if (room.status !== 'LOBBY') {
     state.actionLocked = false;
     showScreen('#game-screen');
@@ -623,6 +634,7 @@ socket.on('connect', async () => {
     state.room = response.room;
     state.playerId = response.playerId ?? null;
     state.isSpectator = Boolean(response.isSpectator);
+    reportPlatformActivity(state.isSpectator ? 'SPECTATING' : response.room.status === 'LOBBY' ? 'LOBBY' : 'PLAYING');
     showScreen(response.room.status === 'LOBBY' ? '#lobby-screen' : '#game-screen');
     response.room.status === 'LOBBY' ? renderLobby() : renderGame();
     toast(response.isSpectator ? '관전 중인 방으로 다시 연결했습니다.' : '기존 플레이어로 다시 연결했습니다.');
@@ -633,6 +645,7 @@ socket.on('connect', async () => {
 
 applyInviteFromLocation();
 applyPlatformJoinFromLocation();
+reportPlatformActivity('LOBBY');
 
 socket.on('dicePlaced', ({ roundPlacementComplete }) => {
   playSound('place');
