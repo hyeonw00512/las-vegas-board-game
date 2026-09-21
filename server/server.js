@@ -86,6 +86,7 @@ function reconnectKey(roomCode, playerId) {
 }
 
 io.on('connection', (socket) => {
+  socket.on('reserveNextGame', (_, callback) => { try { const room = findSocketRoom(socket); if (!room || !socket.data.isSpectator || room.status !== 'PLAYING' || room.players.filter((player) => !player.abandoned).length >= room.maxPlayers) throw new Error('빈자리가 있는 진행 중인 방에서만 다음 게임 참가를 예약할 수 있습니다.'); const spectator = room.spectators.get(socket.data.spectatorToken); if (!spectator) throw new Error('관전자 정보를 찾을 수 없습니다.'); spectator.reservedNextGame = true; room.addLog(`${spectator.nickname}님이 다음 게임 참가를 예약했습니다.`, 'join'); publish(room); reply(callback, { ok: true }); } catch (error) { reply(callback, { ok: false, message: error.message }); } });
   socket.on('platformJoin', ({ joinToken } = {}, callback) => {
     try {
       const payload = verifyPlatformJoinToken(joinToken);
@@ -420,7 +421,7 @@ app.get('/api/platform/rooms', (_request, response) => {
     version: 1,
     gameId: 'neon-dice',
     updatedAt: new Date().toISOString(),
-    capabilities: { canSpectate: true, canReserveNextRound: false },
+    capabilities: { canSpectate: true, canReserveNextRound: true },
     rooms: [...rooms.values()].map((room) => ({
       roomCode: room.code,
       hostNickname: room.getPlayer(room.hostId)?.nickname || '알 수 없음',
@@ -432,7 +433,7 @@ app.get('/api/platform/rooms', (_request, response) => {
       requiresPassword: false,
       canJoin: room.status === 'LOBBY' && room.players.length < room.maxPlayers,
       canSpectate: true,
-      canReserveNextRound: false,
+      canReserveNextRound: room.status === 'PLAYING' && room.players.filter((player) => !player.abandoned).length < room.maxPlayers,
       joinUrl: `${baseUrl}/?room=${room.code}`
     }))
   });

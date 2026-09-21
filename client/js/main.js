@@ -499,6 +499,7 @@ async function applyPlatformJoinFromLocation() {
   if (!response?.ok) return errorAt('#start-error', response?.message || '자동 입장에 실패했습니다.');
   state.room = response.room; state.playerId = response.playerId ?? null; state.isSpectator = Boolean(response.isSpectator);
   if (response.isSpectator) sessionStorage.setItem(SPECTATOR_SESSION_KEY, JSON.stringify({ code: response.room.code, spectatorToken: response.spectatorToken }));
+  if (new URLSearchParams(window.location.search).get('reserveNextRound') === '1') { const reserved = await emit('reserveNextGame'); if (!reserved?.ok) return errorAt('#start-error', reserved?.message || '다음 게임 예약에 실패했습니다.'); toast('다음 게임 참가를 예약했습니다. 관전하며 기다려 주세요.'); }
   else sessionStorage.setItem(SESSION_KEY, JSON.stringify({ code: response.room.code, reconnectToken: response.reconnectToken }));
   showScreen(response.room.status === 'LOBBY' ? '#lobby-screen' : '#game-screen');
 }

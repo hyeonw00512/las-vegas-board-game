@@ -186,6 +186,14 @@ export class GameRoom {
     if (socketId !== this.hostId) throw new Error('방장만 다시 시작할 수 있습니다.');
     if (this.status !== 'GAME_OVER') throw new Error('게임 종료 후 다시 시작할 수 있습니다.');
     this.players = this.players.filter((player) => player.connected && !player.abandoned);
+    for (const [token, spectator] of this.spectators) {
+      if (!spectator.reservedNextGame || !spectator.socketId || this.players.length >= this.maxPlayers) continue;
+      const player = { id: spectator.socketId, nickname: spectator.nickname, color: PLAYER_COLORS[this.players.length], ready: true, dice: [], remainingDice: this.settings.diceCount, remainingNeutralDice: 0, selectedFace: null, money: 0, connected: true };
+      Object.defineProperty(player, 'reconnectToken', { value: randomUUID(), writable: false, enumerable: false });
+      this.players.push(player);
+      this.spectators.delete(token);
+      this.addLog(`${player.nickname}님이 다음 게임 참가자로 전환되었습니다.`, 'join');
+    }
     if (this.players.length < 2) throw new Error('다시 시작하려면 연결된 플레이어가 2명 이상 필요합니다.');
     for (const player of this.players) {
       player.money = 0;
