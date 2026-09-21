@@ -2,6 +2,7 @@ const socket = io();
 const SESSION_KEY = 'lasVegasRoomSession';
 const SPECTATOR_SESSION_KEY = 'lasVegasSpectatorSession';
 const state = { room: null, playerId: null, isSpectator: false, rolling: false, actionLocked: false, lastDiceSignature: '', lastPlacementActionId: '', lastTurnKey: '', unreadChat: 0, soundEnabled: localStorage.getItem('lasVegasSound') !== 'off', orientationHintDismissed: sessionStorage.getItem('lasVegasOrientationHint') === 'dismissed' };
+const platformNickname = new URLSearchParams(location.search).get('platformNickname')?.trim() || '';
 let audioContext;
 const SOUND_ASSETS = Object.freeze({
   roll: '/sounds/dice-roll.mp3',
@@ -14,6 +15,11 @@ const SOUND_ASSETS = Object.freeze({
 });
 const soundPlayers = new Map();
 const unavailableSoundAssets = new Set();
+
+if (platformNickname) {
+  const input = document.querySelector('#nickname');
+  if (input) { input.value = platformNickname.slice(0, 12); input.closest('label')?.setAttribute('hidden', ''); }
+}
 
 if (window.Phaser) {
   new window.Phaser.Game({
