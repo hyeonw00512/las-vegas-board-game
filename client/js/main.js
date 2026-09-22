@@ -207,7 +207,7 @@ function renderLobby() {
   $('#lobby-settings').textContent = `최대 ${room.settings.maxPlayers}명 · 주사위 ${room.settings.diceCount}개 · ${room.settings.rounds}라운드 · ${room.settings.turnSeconds ? `턴 ${room.settings.turnSeconds}초` : '시간 제한 없음'}`;
   $('#lobby-players').innerHTML = room.players.map((player) => `
     <article class="player-row ${player.ready ? 'ready' : ''} ${player.connected ? '' : 'offline'}">
-      <span class="player-token" style="--player:${player.color}">${player.nickname.slice(0, 1).toUpperCase()}</span>
+      <span class="player-token" style="--player:${player.color}">${escapeHtml(player.nickname.slice(0, 1).toUpperCase())}</span>
       <div><b>${escapeHtml(player.nickname)}</b><small>${player.id === room.hostId ? 'HOST' : 'PLAYER'}</small></div>
       <span class="ready-state">${player.connected ? (player.ready ? 'READY' : 'WAIT') : 'RECONNECTING'}</span>
     </article>
