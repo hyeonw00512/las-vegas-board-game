@@ -643,6 +643,10 @@ socket.on('connect', async () => {
   }
 });
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !socket.connected) socket.connect();
+});
+
 applyInviteFromLocation();
 applyPlatformJoinFromLocation();
 reportPlatformActivity('LOBBY');
