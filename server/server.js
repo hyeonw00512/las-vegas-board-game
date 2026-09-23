@@ -412,7 +412,14 @@ setInterval(() => {
   }
 }, 500).unref();
 
-app.use(express.static(clientPath));
+// 이 프로젝트는 자산 파일명이 고정형이므로 Vite 해시 자산처럼 영구 캐시하지 않는다.
+// 다만 1.9MB 카지노 배경은 하루 동안 재사용해 모바일 재방문 데이터 사용량을 줄인다.
+app.use('/assets', express.static(path.join(clientPath, 'assets'), { maxAge: '1d' }));
+app.use(express.static(clientPath, {
+  setHeaders(response, filePath) {
+    if (path.basename(filePath) === 'index.html') response.setHeader('Cache-Control', 'no-cache');
+  }
+}));
 app.use('/vendor/phaser', express.static(path.resolve(clientPath, '../node_modules/phaser/dist')));
 app.get('/health', (_request, response) => response.json({ ok: true }));
 app.get('/api/platform/rooms', (_request, response) => {
