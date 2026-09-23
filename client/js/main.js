@@ -13,6 +13,7 @@ function reportPlatformActivity(status, force = false) {
   try { endpoint = new URL('/api/activity', platformHomeUrl()).toString(); } catch { return; }
   fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: platformActivityToken, status }), keepalive: true }).catch(() => { lastPlatformActivity = ''; });
 }
+window.addEventListener('pagehide', () => reportPlatformActivity('OFFLINE', true));
 let audioContext;
 const SOUND_ASSETS = Object.freeze({
   roll: '/sounds/dice-roll.mp3',
