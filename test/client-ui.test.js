@@ -13,6 +13,13 @@ test('게임 이름과 인원별 플레이 방법을 제공한다', () => {
   }
 });
 
+test('플랫폼 복귀 버튼은 이용방법 모달을 함께 열지 않는다', () => {
+  const returnButton = html.match(/<button[^>]*data-platform-return[^>]*>플랫폼으로 돌아가기<\/button>/)?.[0];
+  assert.ok(returnButton, '시작 화면에 플랫폼 복귀 버튼이 있어야 합니다.');
+  assert.doesNotMatch(returnButton, /rules-open/);
+  assert.match(script, /querySelectorAll\('\[data-platform-return\]'\)/);
+});
+
 test('주사위 굴림 효과는 새로운 굴림 데이터에만 적용한다', () => {
   assert.match(script, /diceSignature !== state\.lastDiceSignature/);
   assert.match(script, /shouldAnimate \? 'rolling-in'/);
